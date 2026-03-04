@@ -231,7 +231,7 @@ class SettingsStore {
 class GitHubUpdater {
     static let shared = GitHubUpdater()
     private let repo = "iddictive/DPI-Killer"
-    private let currentVersion = "1.2.0"
+    private let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     private var isChecking = false
     private var downloadTask: URLSessionDownloadTask?
     private var observation: NSKeyValueObservation?

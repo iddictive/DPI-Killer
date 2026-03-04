@@ -2,26 +2,56 @@ name: Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
 
 jobs:
-  release:
-    runs-on: macos-latest
+  build:
+    name: Build and Release
+    runs-on: macos-15
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Show Xcode Version
+        run: xcodebuild -version
+
+      - name: Calculate Version
+        id: versioning
+        run: |
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          APP_VERSION="1.2.$COMMIT_COUNT"
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+          echo "VERSION=$APP_VERSION" >> $GITHUB_OUTPUT
 
       - name: Build App
         run: |
           bash build.sh
+          
+          # Inject version into Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ env.APP_VERSION }}" "DPIKiller.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ env.APP_VERSION }}" "DPIKiller.app/Contents/Info.plist" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string ${{ env.APP_VERSION }}" "DPIKiller.app/Contents/Info.plist"
+          
+          # Re-sign after plist modification
+          codesign --force --deep --sign - DPIKiller.app
 
       - name: Create DMG
         run: |
           bash scripts/create_dmg.sh
 
-      - name: Create Release
+      - name: Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: v${{ env.APP_VERSION }}
+          name: DPI Killer v${{ env.APP_VERSION }}
           files: DPIKiller.dmg
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
