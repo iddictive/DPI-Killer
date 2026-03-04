@@ -233,6 +233,8 @@ class GitHubUpdater {
     private let repo = "iddictive/DPI-Killer"
     private let currentVersion = "1.2.0"
     private var isChecking = false
+    private var downloadTask: URLSessionDownloadTask?
+    private var observation: NSKeyValueObservation?
 
     func checkForUpdates(manual: Bool = false) {
         if !manual && !SettingsStore.shared.autoUpdate { return }
@@ -240,9 +242,22 @@ class GitHubUpdater {
         isChecking = true
         
         let url = URL(string: "https://api.github.com/repos/\(repo)/releases/latest")!
-        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+        var request = URLRequest(url: url)
+        request.setValue("DPIKillerUpdater", forHTTPHeaderField: "User-Agent")
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             defer { self?.isChecking = false }
-            guard let data = data, error == nil else { return }
+            guard let data = data, error == nil else { 
+                if manual {
+                    DispatchQueue.main.async {
+                        let alert = NSAlert()
+                        alert.messageText = L10n.shared.updateFailed
+                        alert.informativeText = error?.localizedDescription ?? "Network error."
+                        alert.runModal()
+                    }
+                }
+                return 
+            }
             
             do {
                 if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -291,15 +306,23 @@ class GitHubUpdater {
         let progress = NSAlert()
         progress.messageText = L10n.shared.updateDownloading
         let indicator = NSProgressIndicator(frame: NSRect(x: 0, y: 0, width: 200, height: 20))
-        indicator.isIndeterminate = true
-        indicator.startAnimation(nil)
+        indicator.isIndeterminate = false
+        indicator.minValue = 0
+        indicator.maxValue = 1
+        indicator.doubleValue = 0
         progress.accessoryView = indicator
         
-        let downloadTask = URLSession.shared.downloadTask(with: url) { [weak self] localURL, _, error in
+        downloadTask = URLSession.shared.downloadTask(with: url) { [weak self] localURL, _, error in
             DispatchQueue.main.async {
+                self?.observation = nil
                 if let localURL = localURL, error == nil {
+                    // Copy to a permanent temp path
+                    let tempPath = NSTemporaryDirectory() + "DPIKillerUpdate.dmg"
+                    try? FileManager.default.removeItem(atPath: tempPath)
+                    try? FileManager.default.copyItem(at: localURL, to: URL(fileURLWithPath: tempPath))
+                    
                     progress.window.close()
-                    self?.performInstallation(dmgPath: localURL.path)
+                    self?.performInstallation(dmgPath: tempPath)
                 } else {
                     let fail = NSAlert()
                     fail.messageText = L10n.shared.updateFailed
@@ -309,7 +332,13 @@ class GitHubUpdater {
             }
         }
         
-        downloadTask.resume()
+        observation = downloadTask?.progress.observe(\.fractionCompleted) { progress, _ in
+            DispatchQueue.main.async {
+                indicator.doubleValue = progress.fractionCompleted
+            }
+        }
+        
+        downloadTask?.resume()
         progress.runModal()
     }
 
@@ -325,6 +354,8 @@ class GitHubUpdater {
             let script = """
             mkdir -p /tmp/dpi_killer_update
             hdiutil attach "\(dmgPath)" -mountpoint /tmp/dpi_killer_update -nobrowse -quiet
+            # Force replace existing app
+            rm -rf /Applications/DPIKiller.app
             cp -R /tmp/dpi_killer_update/DPIKiller.app /Applications/
             hdiutil detach /tmp/dpi_killer_update -quiet
             """
@@ -342,6 +373,7 @@ class GitHubUpdater {
                 } else {
                     let fail = NSAlert()
                     fail.messageText = L10n.shared.updateFailed
+                    fail.informativeText = "Could not copy the new version to /Applications."
                     fail.runModal()
                 }
             }
@@ -350,7 +382,7 @@ class GitHubUpdater {
     }
 
     private func relaunch() {
-        let appPath = Bundle.main.bundlePath
+        let appPath = "/Applications/DPIKiller.app"
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
         process.arguments = [appPath]
