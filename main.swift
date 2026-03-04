@@ -85,6 +85,7 @@ struct L10n {
     var updateFailed: String { isRussian ? "Ошибка обновления" : "Update Failed" }
     var autoUpdateTitle: String { isRussian ? "Обновления:" : "Updates:" }
     var autoUpdateToggle: String { isRussian ? "Автоматически проверять обновления" : "Automatically check for updates" }
+    var autoDownloadToggle: String { isRussian ? "Автоматически скачивать обновления" : "Automatically download updates" }
 }
 
 // MARK: - Settings Store
@@ -135,6 +136,11 @@ class SettingsStore {
     var autoUpdate: Bool {
         get { defaults.object(forKey: "autoUpdate") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "autoUpdate") }
+    }
+    
+    var autoDownload: Bool {
+        get { defaults.object(forKey: "autoDownload") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "autoDownload") }
     }
     
     var selectedFlags: Set<String> {
@@ -270,7 +276,11 @@ class GitHubUpdater {
                         let downloadUrl = dmgAsset?["browser_download_url"] as? String
                         
                         DispatchQueue.main.async {
-                            self?.showUpdateAlert(version: latestVersion, downloadUrl: downloadUrl)
+                            if !manual && SettingsStore.shared.autoDownload, let dlUrl = downloadUrl, let url = URL(string: dlUrl) {
+                                self?.startAutomatedUpdate(url: url)
+                            } else {
+                                self?.showUpdateAlert(version: latestVersion, downloadUrl: downloadUrl)
+                            }
                         }
                     } else if manual {
                         DispatchQueue.main.async {
@@ -651,6 +661,13 @@ class SettingsWindowController: NSWindowController {
         updateCheckbox.frame = NSRect(x: 20, y: currentY, width: 410, height: 20)
         updateCheckbox.state = SettingsStore.shared.autoUpdate ? .on : .off
         view.addSubview(updateCheckbox)
+        currentY -= 22
+        
+        let downloadCheckbox = NSButton(checkboxWithTitle: L10n.shared.autoDownloadToggle, target: self, action: #selector(toggleDownloadItem))
+        downloadCheckbox.frame = NSRect(x: 20, y: currentY, width: 410, height: 20)
+        downloadCheckbox.state = SettingsStore.shared.autoDownload ? .on : .off
+        downloadCheckbox.isEnabled = SettingsStore.shared.autoUpdate
+        view.addSubview(downloadCheckbox)
         currentY -= 40
 
         // DNS Section
@@ -721,6 +738,10 @@ class SettingsWindowController: NSWindowController {
     
     @objc func toggleLoginItem(_ sender: NSButton) {
         SettingsStore.shared.launchAtLogin = (sender.state == .on)
+    }
+    
+    @objc func toggleDownloadItem(_ sender: NSButton) {
+        SettingsStore.shared.autoDownload = (sender.state == .on)
     }
     
     @objc func toggleUpdateItem(_ sender: NSButton) {
