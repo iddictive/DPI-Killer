@@ -71,6 +71,18 @@ struct L10n {
     var failedToStart: String { isRussian ? "Не удалось запустить" : "Failed to start" }
     var preparingBypass: String { isRussian ? "Подготовка обхода... ⚡️" : "Preparing your bypass... ⚡️" }
     var cancel: String { isRussian ? "Отмена" : "Cancel" }
+    
+    // Updates
+    var updateCheck: String { isRussian ? "Проверить обновления..." : "Check for Updates..." }
+    var updateChecking: String { isRussian ? "Проверка обновлений..." : "Checking for updates..." }
+    var updateAvailable: String { isRussian ? "Доступно обновление" : "Update Available" }
+    var updateLatest: String { isRussian ? "У вас установлена последняя версия." : "You are on the latest version." }
+    var updateFound: String { isRussian ? "Доступна новая версия %@. Хотите обновиться?" : "A new version %@ is available. Would you like to update?" }
+    var updateDownload: String { isRussian ? "Скачать и установить" : "Download & Install" }
+    var updateLater: String { isRussian ? "Позже" : "Later" }
+    var updateDownloading: String { isRussian ? "Загрузка обновления..." : "Downloading update..." }
+    var updateInstalling: String { isRussian ? "Установка обновления..." : "Installing update..." }
+    var updateFailed: String { isRussian ? "Ошибка обновления" : "Update Failed" }
 }
 
 // MARK: - Settings Store
@@ -205,6 +217,137 @@ class SettingsStore {
             if FileManager.default.fileExists(atPath: path) { return path }
         }
         return "spoofdpi" // Fallback to PATH
+    }
+}
+
+// MARK: - GitHub Auto-Update
+class GitHubUpdater {
+    static let shared = GitHubUpdater()
+    private let repo = "iddictive/DPI-Killer"
+    private let currentVersion = "1.2.0"
+    private var isChecking = false
+
+    func checkForUpdates(manual: Bool = false) {
+        guard !isChecking else { return }
+        isChecking = true
+        
+        let url = URL(string: "https://api.github.com/repos/\(repo)/releases/latest")!
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            defer { self?.isChecking = false }
+            guard let data = data, error == nil else { return }
+            
+            do {
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let tagName = json["tag_name"] as? String {
+                    
+                    let latestVersion = tagName.replacingOccurrences(of: "v", with: "")
+                    if self?.compareVersions(current: self?.currentVersion ?? "", latest: latestVersion) == true {
+                        let assets = json["assets"] as? [[String: Any]]
+                        let dmgAsset = assets?.first(where: { ($0["name"] as? String)?.hasSuffix(".dmg") == true })
+                        let downloadUrl = dmgAsset?["browser_download_url"] as? String
+                        
+                        DispatchQueue.main.async {
+                            self?.showUpdateAlert(version: latestVersion, downloadUrl: downloadUrl)
+                        }
+                    } else if manual {
+                        DispatchQueue.main.async {
+                            let alert = NSAlert()
+                            alert.messageText = L10n.shared.updateLatest
+                            alert.runModal()
+                        }
+                    }
+                }
+            } catch {
+                print("Update check error: \(error)")
+            }
+        }.resume()
+    }
+
+    private func compareVersions(current: String, latest: String) -> Bool {
+        return latest.compare(current, options: .numeric) == .orderedDescending
+    }
+
+    private func showUpdateAlert(version: String, downloadUrl: String?) {
+        let alert = NSAlert()
+        alert.messageText = L10n.shared.updateAvailable
+        alert.informativeText = String(format: L10n.shared.updateFound, version)
+        alert.addButton(withTitle: L10n.shared.updateDownload)
+        alert.addButton(withTitle: L10n.shared.updateLater)
+        
+        if alert.runModal() == .alertFirstButtonReturn, let urlString = downloadUrl, let url = URL(string: urlString) {
+            startAutomatedUpdate(url: url)
+        }
+    }
+
+    private func startAutomatedUpdate(url: URL) {
+        let progress = NSAlert()
+        progress.messageText = L10n.shared.updateDownloading
+        let indicator = NSProgressIndicator(frame: NSRect(x: 0, y: 0, width: 200, height: 20))
+        indicator.isIndeterminate = true
+        indicator.startAnimation(nil)
+        progress.accessoryView = indicator
+        
+        let downloadTask = URLSession.shared.downloadTask(with: url) { [weak self] localURL, _, error in
+            DispatchQueue.main.async {
+                if let localURL = localURL, error == nil {
+                    progress.window.close()
+                    self?.performInstallation(dmgPath: localURL.path)
+                } else {
+                    let fail = NSAlert()
+                    fail.messageText = L10n.shared.updateFailed
+                    fail.informativeText = error?.localizedDescription ?? "Download failed."
+                    fail.runModal()
+                }
+            }
+        }
+        
+        downloadTask.resume()
+        progress.runModal()
+    }
+
+    private func performInstallation(dmgPath: String) {
+        let installAlert = NSAlert()
+        installAlert.messageText = L10n.shared.updateInstalling
+        let indicator = NSProgressIndicator(frame: NSRect(x: 0, y: 0, width: 200, height: 20))
+        indicator.isIndeterminate = true
+        indicator.startAnimation(nil)
+        installAlert.accessoryView = indicator
+        
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let script = """
+            mkdir -p /tmp/dpi_killer_update
+            hdiutil attach "\(dmgPath)" -mountpoint /tmp/dpi_killer_update -nobrowse -quiet
+            cp -R /tmp/dpi_killer_update/DPIKiller.app /Applications/
+            hdiutil detach /tmp/dpi_killer_update -quiet
+            """
+            
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/bash")
+            process.arguments = ["-c", script]
+            try? process.run()
+            process.waitUntilExit()
+            
+            DispatchQueue.main.async {
+                installAlert.window.close()
+                if process.terminationStatus == 0 {
+                    self?.relaunch()
+                } else {
+                    let fail = NSAlert()
+                    fail.messageText = L10n.shared.updateFailed
+                    fail.runModal()
+                }
+            }
+        }
+        installAlert.runModal()
+    }
+
+    private func relaunch() {
+        let appPath = Bundle.main.bundlePath
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = [appPath]
+        try? process.run()
+        NSApp.terminate(nil)
     }
 }
 
@@ -665,6 +808,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         refreshUI()
         loadingWindow = LoadingWindowController(); loadingWindow?.showWithFade()
+        GitHubUpdater.shared.checkForUpdates()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.attemptStart() }
     }
 
@@ -735,6 +879,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: DPIKillerManager.shared.isRunning ? L10n.shared.stop : L10n.shared.start, action: #selector(toggle), keyEquivalent: "t"))
         menu.addItem(NSMenuItem(title: L10n.shared.settings, action: #selector(showSettings), keyEquivalent: ","))
+        menu.addItem(NSMenuItem(title: L10n.shared.updateCheck, action: #selector(checkUpdate), keyEquivalent: "u"))
         menu.addItem(NSMenuItem(title: L10n.shared.instructions, action: #selector(showHelp), keyEquivalent: "h"))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: L10n.shared.quit, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -749,6 +894,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func showSettings() { if settingsWindow == nil { settingsWindow = SettingsWindowController() }; NSApp.activate(ignoringOtherApps: true); settingsWindow?.showWindow(nil) }
     @objc func showHelp() { if helpWindow == nil { helpWindow = HelpWindowController() }; NSApp.activate(ignoringOtherApps: true); helpWindow?.showWindow(nil) }
+    @objc func checkUpdate() { GitHubUpdater.shared.checkForUpdates(manual: true) }
     
     func applicationWillTerminate(_ notification: Notification) {
         if let p = DPIKillerManager.shared.process { p.terminate(); p.waitUntilExit() }
