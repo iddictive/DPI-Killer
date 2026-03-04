@@ -83,6 +83,8 @@ struct L10n {
     var updateDownloading: String { isRussian ? "Загрузка обновления..." : "Downloading update..." }
     var updateInstalling: String { isRussian ? "Установка обновления..." : "Installing update..." }
     var updateFailed: String { isRussian ? "Ошибка обновления" : "Update Failed" }
+    var autoUpdateTitle: String { isRussian ? "Обновления:" : "Updates:" }
+    var autoUpdateToggle: String { isRussian ? "Автоматически проверять обновления" : "Automatically check for updates" }
 }
 
 // MARK: - Settings Store
@@ -128,6 +130,11 @@ class SettingsStore {
     var dnsHttpsUrl: String {
         get { defaults.string(forKey: "dnsHttpsUrl") ?? "https://dns.google/dns-query" }
         set { defaults.set(newValue, forKey: "dnsHttpsUrl") }
+    }
+    
+    var autoUpdate: Bool {
+        get { defaults.object(forKey: "autoUpdate") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "autoUpdate") }
     }
     
     var selectedFlags: Set<String> {
@@ -228,6 +235,7 @@ class GitHubUpdater {
     private var isChecking = false
 
     func checkForUpdates(manual: Bool = false) {
+        if !manual && !SettingsStore.shared.autoUpdate { return }
         guard !isChecking else { return }
         isChecking = true
         
@@ -494,7 +502,7 @@ class SettingsWindowController: NSWindowController {
     
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 450, height: 750),
+            contentRect: NSRect(x: 0, y: 0, width: 450, height: 850),
             styleMask: [.titled, .closable],
             backing: .buffered, defer: false)
         window.center()
@@ -504,10 +512,10 @@ class SettingsWindowController: NSWindowController {
     }
     
     func setupUI() {
-        let view = NSView(frame: NSRect(x: 0, y: 0, width: 450, height: 750))
+        let view = NSView(frame: NSRect(x: 0, y: 0, width: 450, height: 850))
         window?.contentView = view
         
-        var currentY: CGFloat = 700
+        var currentY: CGFloat = 800
         
         let pathLabel = NSTextField(labelWithString: L10n.shared.binaryPath)
         pathLabel.font = .systemFont(ofSize: 13, weight: .bold)
@@ -589,6 +597,30 @@ class SettingsWindowController: NSWindowController {
         view.addSubview(wsInstr)
         currentY -= 40
         
+        let loginLabel = NSTextField(labelWithString: L10n.shared.autoLaunchTitle)
+        loginLabel.font = .systemFont(ofSize: 13, weight: .bold)
+        loginLabel.frame = NSRect(x: 20, y: currentY, width: 300, height: 20)
+        view.addSubview(loginLabel)
+        currentY -= 25
+        
+        let loginCheckbox = NSButton(checkboxWithTitle: L10n.shared.launchAtLogin, target: self, action: #selector(toggleLoginItem))
+        loginCheckbox.frame = NSRect(x: 20, y: currentY, width: 410, height: 20)
+        loginCheckbox.state = SettingsStore.shared.launchAtLogin ? .on : .off
+        view.addSubview(loginCheckbox)
+        currentY -= 30
+        
+        let updateLabel = NSTextField(labelWithString: L10n.shared.autoUpdateTitle)
+        updateLabel.font = .systemFont(ofSize: 13, weight: .bold)
+        updateLabel.frame = NSRect(x: 20, y: currentY, width: 300, height: 20)
+        view.addSubview(updateLabel)
+        currentY -= 25
+        
+        let updateCheckbox = NSButton(checkboxWithTitle: L10n.shared.autoUpdateToggle, target: self, action: #selector(toggleUpdateItem))
+        updateCheckbox.frame = NSRect(x: 20, y: currentY, width: 410, height: 20)
+        updateCheckbox.state = SettingsStore.shared.autoUpdate ? .on : .off
+        view.addSubview(updateCheckbox)
+        currentY -= 40
+
         // DNS Section
         let dnsLabel = NSTextField(labelWithString: L10n.shared.dnsTitle)
         dnsLabel.font = .systemFont(ofSize: 13, weight: .bold)
@@ -649,17 +681,6 @@ class SettingsWindowController: NSWindowController {
         view.addSubview(manualArgsField)
         currentY -= 45
         
-        let loginLabel = NSTextField(labelWithString: L10n.shared.autoLaunchTitle)
-        loginLabel.font = .systemFont(ofSize: 13, weight: .bold)
-        loginLabel.frame = NSRect(x: 20, y: currentY, width: 300, height: 20)
-        view.addSubview(loginLabel)
-        currentY -= 25
-        
-        let loginCheckbox = NSButton(checkboxWithTitle: L10n.shared.launchAtLogin, target: self, action: #selector(toggleLoginItem))
-        loginCheckbox.frame = NSRect(x: 20, y: currentY, width: 410, height: 20)
-        loginCheckbox.state = SettingsStore.shared.launchAtLogin ? .on : .off
-        view.addSubview(loginCheckbox)
-        
         let saveButton = NSButton(title: L10n.shared.saveAndRestart, target: self, action: #selector(save))
         saveButton.frame = NSRect(x: 220, y: 20, width: 210, height: 32)
         saveButton.bezelStyle = .rounded
@@ -668,6 +689,10 @@ class SettingsWindowController: NSWindowController {
     
     @objc func toggleLoginItem(_ sender: NSButton) {
         SettingsStore.shared.launchAtLogin = (sender.state == .on)
+    }
+    
+    @objc func toggleUpdateItem(_ sender: NSButton) {
+        SettingsStore.shared.autoUpdate = (sender.state == .on)
     }
     
     @objc func save() {
