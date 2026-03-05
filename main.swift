@@ -410,6 +410,15 @@ class DPIKillerManager {
     private var installProcess: Process?
     private(set) var isRunning = false
     
+    // MARK: CPU Watchdog
+    private var watchdogTimer: DispatchSourceTimer?
+    private var highCpuStrikes = 0
+    private let maxStrikes = 3           // 3 consecutive checks before restart
+    private let cpuThreshold = 150.0     // % CPU per-process threshold
+    private let watchdogInterval: UInt64 = 30 // seconds between checks
+    private var lastRestartTime: Date?
+    private let restartCooldown: TimeInterval = 60 // min seconds between auto-restarts
+    
     func start(completion: @escaping (Bool, String?) -> Void) {
         if isRunning { stop() }
         killOrphans() // Ensure clean state
@@ -438,6 +447,7 @@ class DPIKillerManager {
             DispatchQueue.main.async {
                 self?.isRunning = false
                 self?.process = nil
+                self?.stopWatchdog()
                 (NSApp.delegate as? AppDelegate)?.refreshUI()
             }
         }
@@ -446,10 +456,110 @@ class DPIKillerManager {
             try process.run()
             self.process = process
             self.isRunning = true
+            startWatchdog()
             completion(true, nil)
         } catch {
             self.isRunning = false
             completion(false, error.localizedDescription)
+        }
+    }
+    
+    // MARK: Watchdog lifecycle
+    
+    private func startWatchdog() {
+        stopWatchdog()
+        highCpuStrikes = 0
+        
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
+        timer.schedule(deadline: .now() + .seconds(Int(watchdogInterval)), repeating: .seconds(Int(watchdogInterval)))
+        timer.setEventHandler { [weak self] in
+            self?.checkCPU()
+        }
+        timer.resume()
+        watchdogTimer = timer
+    }
+    
+    private func stopWatchdog() {
+        watchdogTimer?.cancel()
+        watchdogTimer = nil
+        highCpuStrikes = 0
+    }
+    
+    private func getCPUUsage() -> Double? {
+        guard let proc = process, proc.isRunning else { return nil }
+        let pid = proc.processIdentifier
+        
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/bin/ps")
+        task.arguments = ["-p", "\(pid)", "-o", "%cpu="]
+        
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = FileHandle.nullDevice
+        
+        do {
+            try task.run()
+            task.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            if let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+               let cpu = Double(output) {
+                return cpu
+            }
+        } catch {}
+        return nil
+    }
+    
+    private func checkCPU() {
+        guard isRunning, let cpu = getCPUUsage() else {
+            highCpuStrikes = 0
+            return
+        }
+        
+        if cpu > cpuThreshold {
+            highCpuStrikes += 1
+            print("[Watchdog] High CPU detected: \(cpu)% (strike \(highCpuStrikes)/\(maxStrikes))")
+            
+            if highCpuStrikes >= maxStrikes {
+                print("[Watchdog] CPU threshold exceeded for \(highCpuStrikes) consecutive checks. Auto-restarting spoofdpi...")
+                DispatchQueue.main.async { [weak self] in
+                    self?.restartDueToHighCPU()
+                }
+            }
+        } else {
+            if highCpuStrikes > 0 {
+                print("[Watchdog] CPU back to normal: \(cpu)%. Resetting strikes.")
+            }
+            highCpuStrikes = 0
+        }
+    }
+    
+    private func restartDueToHighCPU() {
+        // Cooldown check
+        if let lastRestart = lastRestartTime, Date().timeIntervalSince(lastRestart) < restartCooldown {
+            print("[Watchdog] Cooldown active, skipping restart.")
+            return
+        }
+        
+        lastRestartTime = Date()
+        highCpuStrikes = 0
+        
+        // Stop current process
+        stopWatchdog()
+        process?.terminate()
+        process = nil
+        isRunning = false
+        killOrphans()
+        
+        // Restart after brief delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.start { success, error in
+                if success {
+                    print("[Watchdog] spoofdpi restarted successfully.")
+                } else {
+                    print("[Watchdog] Failed to restart spoofdpi: \(error ?? "unknown error")")
+                }
+                (NSApp.delegate as? AppDelegate)?.refreshUI()
+            }
         }
     }
     
@@ -494,6 +604,7 @@ class DPIKillerManager {
 
     func stop() {
         isRunning = false
+        stopWatchdog()
         process?.terminate()
         process = nil
         killOrphans() // Double safety cleanup
