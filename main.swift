@@ -128,6 +128,10 @@ struct L10n {
     // IPv6
     var disableIpv6: String { isRussian ? "Отключить IPv6 (рекомендуется)" : "Disable IPv6 (recommended)" }
     var ipv6Warning: String { isRussian ? "Предотвращает утечки трафика мимо прокси." : "Prevents traffic leakage bypassing the proxy." }
+    
+    // Auto Reconnect
+    var autoReconnect: String { isRussian ? "Авто-реконнект" : "Auto-reconnect" }
+    var tipAutoReconnect: String { isRussian ? "Автоматически восстанавливать прокси при восстановлении WiFi." : "Automatically restore proxy when WiFi connection is restored." }
 
     // Sections
     var sectionCore: String { isRussian ? "📦 Основные настройки" : "📦 Core Settings" }
@@ -302,6 +306,11 @@ class SettingsStore {
             defaults.set(newValue, forKey: "disableIpv6")
             applyIpv6Settings(newValue)
         }
+    }
+
+    var autoReconnect: Bool {
+        get { defaults.object(forKey: "autoReconnect") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "autoReconnect") }
     }
     
     private func applyIpv6Settings(_ disable: Bool) {
@@ -635,7 +644,7 @@ class DPIKillerManager {
     init() {
         NetworkMonitor.shared.onConnectivityRestored = { [weak self] in
             guard let self = self else { return }
-            if self.wasRunningBeforeDisconnect {
+            if SettingsStore.shared.autoReconnect && self.wasRunningBeforeDisconnect {
                 print("[Manager] Auto-restarting after network restoration...")
                 self.start { success, error in
                     if success {
@@ -1531,6 +1540,12 @@ class SettingsWindowController: NSWindowController {
         let ipv6Cb = NSButton(checkboxWithTitle: L10n.shared.disableIpv6, target: self, action: #selector(toggleIpv6))
         ipv6Cb.state = SettingsStore.shared.disableIpv6 ? .on : .off
         addCheckboxRow(button: ipv6Cb, to: appStack)
+        
+        let reconnectCb = NSButton(checkboxWithTitle: L10n.shared.autoReconnect, target: self, action: #selector(toggleReconnect))
+        reconnectCb.toolTip = L10n.shared.tipAutoReconnect
+        reconnectCb.state = SettingsStore.shared.autoReconnect ? .on : .off
+        addCheckboxRow(button: reconnectCb, to: appStack)
+        
         addSection(appBox)
         
         // --- SECTION 6: MANUAL ---
@@ -1650,6 +1665,10 @@ class SettingsWindowController: NSWindowController {
     
     @objc func toggleUpdateItem(_ sender: NSButton) {
         SettingsStore.shared.autoUpdate = (sender.state == .on)
+    }
+    
+    @objc func toggleReconnect(_ sender: NSButton) {
+        SettingsStore.shared.autoReconnect = (sender.state == .on)
     }
     
     @objc func toggleIpv6(_ sender: NSButton) {
