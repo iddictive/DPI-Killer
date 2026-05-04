@@ -19,12 +19,17 @@ final class DPIKillerManager {
     private let watchdogInterval: UInt64 = 30
     private var lastRestartTime: Date?
     private let restartCooldown: TimeInterval = 300
+    private var forceSystemProxyOverride = false
     private var wasRunningBeforeDisconnect = false
     private var shouldRestoreAfterDisconnect = false
     private var isConnectivityRestartInProgress = false
 
     private var currentEngine: BypassEngine {
         SettingsStore.shared.currentEngine()
+    }
+
+    var isUsingProxyFallback: Bool {
+        forceSystemProxyOverride && isRunning
     }
 
     init() {
@@ -61,6 +66,15 @@ final class DPIKillerManager {
     }
 
     func start(completion: @escaping (Bool, String?) -> Void) {
+        start(forceSystemProxy: false, completion: completion)
+    }
+
+    func startProxyFallback(completion: @escaping (Bool, String?) -> Void) {
+        start(forceSystemProxy: true, completion: completion)
+    }
+
+    private func start(forceSystemProxy: Bool, completion: @escaping (Bool, String?) -> Void) {
+        forceSystemProxyOverride = forceSystemProxy
         if isRunning {
             stop()
         }
@@ -105,13 +119,15 @@ final class DPIKillerManager {
             }
         }
 
-        process.terminationHandler = { [weak self] _ in
+        process.terminationHandler = { [weak self, weak process] _ in
             DispatchQueue.main.async {
-                self?.outputPipe?.fileHandleForReading.readabilityHandler = nil
-                self?.outputPipe = nil
-                self?.isRunning = false
-                self?.process = nil
-                self?.stopWatchdog()
+                guard let self, let terminatedProcess = process else { return }
+                guard self.process === terminatedProcess || self.process == nil else { return }
+                self.outputPipe?.fileHandleForReading.readabilityHandler = nil
+                self.outputPipe = nil
+                self.isRunning = false
+                self.process = nil
+                self.stopWatchdog()
                 (NSApp.delegate as? AppDelegate)?.refreshUI()
             }
         }
@@ -142,7 +158,7 @@ final class DPIKillerManager {
                     }
 
                     self.isRunning = true
-                    if SettingsStore.shared.usesSystemProxy {
+                    if forceSystemProxy || (SettingsStore.shared.usesSystemProxy && !SettingsStore.shared.vpnModeEnabled) {
                         self.enableSystemProxy(for: engine)
                     }
                     self.startWatchdog()
@@ -189,6 +205,7 @@ final class DPIKillerManager {
 
     func stop() {
         isRunning = false
+        forceSystemProxyOverride = false
         wasRunningBeforeDisconnect = false
         shouldRestoreAfterDisconnect = false
         isConnectivityRestartInProgress = false
@@ -305,7 +322,7 @@ final class DPIKillerManager {
         killOrphans()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            self?.start { success, error in
+            self?.start(forceSystemProxy: self?.forceSystemProxyOverride ?? false) { success, error in
                 if success {
                     AppLogger.log("[Watchdog] Backend restarted successfully.")
                 } else {
@@ -329,7 +346,7 @@ final class DPIKillerManager {
         disableSystemProxy()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            self?.start(completion: completion)
+            self?.start(forceSystemProxy: self?.forceSystemProxyOverride ?? false, completion: completion)
         }
     }
 

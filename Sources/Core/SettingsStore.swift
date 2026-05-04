@@ -28,6 +28,11 @@ final class SettingsStore {
     private let managedFlagsWithoutValues: Set<String> = [
         "--https-disorder"
     ]
+    private let perEngineManualArgsKeys: [BypassEngine: String] = [
+        .ciadpi: "manualArgs.ciadpi",
+        .spoofdpi: "manualArgs.spoofdpi"
+    ]
+    private let backendSelectionKey = "backendSelection"
 
     var binaryPath: String {
         get {
@@ -112,6 +117,11 @@ final class SettingsStore {
         set { defaults.set(newValue, forKey: "autoReconnect") }
     }
 
+    var vpnModeEnabled: Bool {
+        get { defaults.object(forKey: "vpnModeEnabled") as? Bool ?? false }
+        set { defaults.set(newValue, forKey: "vpnModeEnabled") }
+    }
+
     var launchAtLogin: Bool {
         get { defaults.bool(forKey: "launchAtLogin") }
         set {
@@ -121,8 +131,7 @@ final class SettingsStore {
     }
 
     var selectedFlags: Set<String> {
-        let args = customArgs.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
-        return Set(args.filter {
+        Set(argumentParts(from: customArgs).filter {
             $0.hasPrefix("-")
                 && !managedArgumentKeys.contains($0)
         })
@@ -133,10 +142,16 @@ final class SettingsStore {
     }
 
     var backendSelection: BackendSelection {
-        guard binaryPathWasUserSet else { return .automatic }
         let stored = defaults.string(forKey: "binaryPath") ?? ""
-        guard !stored.isEmpty else { return .automatic }
+        if let raw = defaults.string(forKey: backendSelectionKey),
+           let selection = BackendSelection(rawValue: raw) {
+            return selection
+        }
+        return inferredBackendSelection(from: stored)
+    }
 
+    private func inferredBackendSelection(from stored: String) -> BackendSelection {
+        guard !stored.isEmpty else { return .automatic }
         if preferredCiadpiPaths().contains(stored) {
             return .ciadpi
         }
@@ -148,6 +163,143 @@ final class SettingsStore {
 
     var usesSystemProxy: Bool {
         selectedFlags.contains("--system-proxy")
+    }
+
+    func loadDraft() -> SettingsDraft {
+        let common = CommonSettings(
+            localPort: localPort,
+            defaultTTL: defaultTTL,
+            splitMode: splitMode,
+            httpsDisorder: httpsDisorder,
+            httpsFakeCount: httpsFakeCount,
+            httpsChunkSize: httpsChunkSize,
+            dnsAddr: dnsAddr,
+            dnsMode: dnsMode,
+            dnsHttpsUrl: dnsHttpsUrl,
+            launchAtLogin: launchAtLogin,
+            autoUpdate: autoUpdate,
+            autoDownload: autoDownload,
+            disableIpv6: disableIpv6,
+            autoReconnect: autoReconnect,
+            vpnModeEnabled: vpnModeEnabled
+        )
+
+        return SettingsDraft(
+            backendSelection: backendSelection,
+            customPath: binaryPath,
+            common: common,
+            ciadpi: engineSettings(for: .ciadpi),
+            spoofdpi: engineSettings(for: .spoofdpi)
+        )
+    }
+
+    func saveDraft(_ draft: SettingsDraft) {
+        let resolvedPath = resolvedBinaryPath(
+            for: draft.backendSelection,
+            customPath: draft.customPath
+        )
+        let engine = currentEngine(for: resolvedPath)
+        let engineSettings = draft.engineSettings(for: engine)
+
+        applyBackendSelection(draft.backendSelection, customPath: draft.customPath)
+        localPort = clampedString(draft.common.localPort, defaultValue: 8080, range: 1...65535)
+        launchAtLogin = draft.common.launchAtLogin
+        autoUpdate = draft.common.autoUpdate
+        autoDownload = draft.common.autoDownload
+        disableIpv6 = draft.common.disableIpv6
+        autoReconnect = draft.common.autoReconnect
+        vpnModeEnabled = draft.common.vpnModeEnabled
+
+        defaultTTL = clampedString(draft.common.defaultTTL, defaultValue: 128, range: 1...255)
+        splitMode = draft.common.splitMode.isEmpty ? "sni" : draft.common.splitMode
+        httpsDisorder = draft.common.httpsDisorder
+        httpsFakeCount = clampedString(draft.common.httpsFakeCount, defaultValue: 0, range: 0...100)
+        httpsChunkSize = clampedString(draft.common.httpsChunkSize, defaultValue: 20, range: 1...1000)
+        dnsAddr = draft.common.dnsAddr.trimmingCharacters(in: .whitespacesAndNewlines)
+        dnsMode = draft.common.dnsMode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "udp"
+            : draft.common.dnsMode.trimmingCharacters(in: .whitespacesAndNewlines)
+        dnsHttpsUrl = draft.common.dnsHttpsUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        saveSelectedFlags(draft.ciadpi.selectedFlags, for: .ciadpi)
+        saveSelectedFlags(draft.spoofdpi.selectedFlags, for: .spoofdpi)
+        saveManualArgs(draft.ciadpi.manualArgs, for: .ciadpi)
+        saveManualArgs(draft.spoofdpi.manualArgs, for: .spoofdpi)
+        updateArgs(
+            with: engineSettings.selectedFlags,
+            manual: engineSettings.manualArgs,
+            ttl: defaultTTL,
+            splitMode: splitMode,
+            splitPos: "1",
+            port: localPort,
+            dnsAddr: dnsAddr,
+            dnsMode: dnsMode,
+            dnsHttpsUrl: dnsHttpsUrl
+        )
+    }
+
+    func commandPreview(for selection: BackendSelection? = nil, customPath: String? = nil) -> String {
+        let resolvedPath: String
+        if let selection {
+            resolvedPath = resolvedBinaryPath(for: selection, customPath: customPath)
+        } else if let customPath,
+                  !customPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            resolvedPath = customPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        } else {
+            resolvedPath = binaryPath
+        }
+
+        return ([resolvedPath] + launchArguments(for: resolvedPath))
+            .map(shellEscaped)
+            .joined(separator: " ")
+    }
+
+    func unsupportedManualArgs(_ manual: String, for engine: BypassEngine) -> [String] {
+        let unsupported = unsupportedManualArgumentKeys(for: engine)
+        return argumentParts(from: manual).filter { unsupported.contains($0) }
+    }
+
+    func duplicateManagedFlags(in manual: String) -> [String] {
+        duplicateManagedArguments(in: manual)
+    }
+
+    func duplicateManagedArguments(in manual: String) -> [String] {
+        let parts = argumentParts(from: manual)
+        var duplicates: [String] = []
+        var index = 0
+
+        while index < parts.count {
+            let part = parts[index]
+            if managedFlagsWithoutValues.contains(part) || managedArgumentKeys.contains(part) || generatedManagedArgumentKeys.contains(part) {
+                duplicates.append(part)
+                index += 1
+                if index < parts.count && !parts[index].hasPrefix("-") {
+                    index += 1
+                }
+            } else {
+                index += 1
+            }
+        }
+
+        return duplicates
+    }
+
+    func selectedFlags(for engine: BypassEngine) -> Set<String> {
+        let key = selectedFlagsKey(for: engine)
+        if let stored = defaults.array(forKey: key) as? [String] {
+            return Set(stored).intersection(BackendCapability.forEngine(engine).supportedFlags)
+        }
+
+        return Set(argumentParts(from: customArgs).filter {
+            $0.hasPrefix("-")
+                && !managedArgumentKeys.contains($0)
+        })
+        .intersection(BackendCapability.forEngine(engine).supportedFlags)
+    }
+
+    func saveSelectedFlags(_ flags: Set<String>, for engine: BypassEngine) {
+        let supported = flags.intersection(BackendCapability.forEngine(engine).supportedFlags)
+        defaults.set(supported.sorted(), forKey: selectedFlagsKey(for: engine))
     }
 
     func applyIpv6Preference() {
@@ -169,7 +321,7 @@ final class SettingsStore {
         dnsMode: String,
         dnsHttpsUrl: String
     ) {
-        let manualParts = manual.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+        let manualParts = argumentParts(from: manual)
         var cleanedParts: [String] = []
         var index = 0
         while index < manualParts.count {
@@ -224,6 +376,7 @@ final class SettingsStore {
     }
 
     func applyBackendSelection(_ selection: BackendSelection, customPath: String? = nil) {
+        defaults.set(selection.rawValue, forKey: backendSelectionKey)
         switch selection {
         case .automatic:
             saveDetectedBinaryPath(resolvedBinaryPath(for: selection))
@@ -306,7 +459,7 @@ final class SettingsStore {
     }
 
     func manualArgsString(for explicitPath: String? = nil) -> String {
-        let allArgs = customArgs.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+        let allArgs = argumentParts(from: customArgs)
         let engine = currentEngine(for: explicitPath)
         var manualParts: [String] = []
         var index = 0
@@ -338,10 +491,8 @@ final class SettingsStore {
 
     func launchArguments(for explicitPath: String? = nil) -> [String] {
         let engine = currentEngine(for: explicitPath)
-        let manualParts = manualArgsString(for: explicitPath)
-            .components(separatedBy: .whitespaces)
-            .filter { !$0.isEmpty }
-        let flags = selectedFlags
+        let manualParts = argumentParts(from: manualArgsString(for: explicitPath))
+        let flags = selectedFlags(for: engine)
         let port = (Int(localPort.trimmingCharacters(in: .whitespaces)) ?? 8080).clamped(to: 1...65535)
         let ttlValue = (Int(defaultTTL.trimmingCharacters(in: .whitespaces)) ?? 128).clamped(to: 1...255)
         let fakeCount = (Int(httpsFakeCount.trimmingCharacters(in: .whitespaces)) ?? 0).clamped(to: 0...100)
@@ -413,6 +564,102 @@ final class SettingsStore {
             }
             return args + manualParts
         }
+    }
+
+    private func engineSettings(for engine: BypassEngine) -> EngineSettings {
+        EngineSettings(
+            selectedFlags: selectedFlags(for: engine),
+            manualArgs: storedManualArgs(for: engine)
+        )
+    }
+
+    private func storedManualArgs(for engine: BypassEngine) -> String {
+        if let key = perEngineManualArgsKeys[engine],
+           let stored = defaults.string(forKey: key) {
+            return stored
+        }
+        return manualArgsString(for: legacyMigrationPath(for: engine))
+    }
+
+    private func saveManualArgs(_ manualArgs: String, for engine: BypassEngine) {
+        guard let key = perEngineManualArgsKeys[engine] else { return }
+        defaults.set(manualArgs, forKey: key)
+    }
+
+    private func selectedFlagsKey(for engine: BypassEngine) -> String {
+        "selectedFlags.\(engine.rawValue)"
+    }
+
+    private func legacyMigrationPath(for engine: BypassEngine) -> String {
+        switch engine {
+        case .ciadpi:
+            return "ciadpi"
+        case .spoofdpi:
+            return "spoofdpi"
+        }
+    }
+
+    private func argumentParts(from string: String) -> [String] {
+        string.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+    }
+
+    private func clampedString(_ value: String, defaultValue: Int, range: ClosedRange<Int>) -> String {
+        let intValue = Int(value.trimmingCharacters(in: .whitespacesAndNewlines)) ?? defaultValue
+        return String(intValue.clamped(to: range))
+    }
+
+    private func unsupportedManualArgumentKeys(for engine: BypassEngine) -> Set<String> {
+        switch engine {
+        case .ciadpi:
+            return [
+                "--default-fake-ttl",
+                "--https-split-mode",
+                "--https-split-pos",
+                "--https-fake-count",
+                "--https-chunk-size",
+                "--https-disorder",
+                "--listen-addr",
+                "--dns-addr",
+                "--dns-mode",
+                "--dns-https-url",
+                "--dns-qtype",
+                "--log-level",
+                "--no-tui",
+                "--silent",
+                "--dns-ipv4-only",
+                "--debug"
+            ]
+        case .spoofdpi:
+            return [
+                "-p",
+                "--port",
+                "--def-ttl",
+                "--auto",
+                "--split",
+                "--disorder",
+                "--fake",
+                "--ttl",
+                "--tlsrec",
+                "--policy-auto"
+            ]
+        }
+    }
+
+    private var generatedManagedArgumentKeys: Set<String> {
+        [
+            "--default-fake-ttl",
+            "--dns-qtype",
+            "--log-level"
+        ]
+    }
+
+    private func shellEscaped(_ value: String) -> String {
+        let specialCharacters = CharacterSet.whitespacesAndNewlines
+            .union(CharacterSet(charactersIn: "'\"\\$`!;|&<>()*?[]{}"))
+        guard value.rangeOfCharacter(from: specialCharacters) != nil else {
+            return value
+        }
+        return "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
     private func applyIpv6Settings(_ disable: Bool) {

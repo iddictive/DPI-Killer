@@ -133,5 +133,6 @@ final class LogStore {
 enum AppLogger {
     static func log(_ message: String) {
         LogStore.shared.append(message)
+        NSLog("%@", message)
     }
 }

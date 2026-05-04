@@ -103,6 +103,24 @@ struct L10n {
     var autoUpdateTitle: String { isRussian ? "Обновления:" : "Updates:" }
     var autoUpdateToggle: String { isRussian ? "Автоматически проверять обновления" : "Automatically check for updates" }
     var autoDownloadToggle: String { isRussian ? "Автоматически скачивать обновления" : "Automatically download updates" }
+    var vpnModeToggle: String { isRussian ? "Системный VPN-режим" : "System VPN Mode" }
+    var tipVPNMode: String { isRussian ? "Поднимает Packet Tunnel поверх локального backend-а вместо networksetup proxy." : "Starts a Packet Tunnel on top of the local backend instead of using networksetup proxy." }
+    var vpnModeMissingBundle: String { isRussian ? "VPN-режим недоступен: tunnel extension не встроен в приложение." : "VPN mode is unavailable: the tunnel extension is not embedded in the app." }
+    var vpnModeMissingSignature: String { isRussian ? "VPN-режим недоступен: приложению нужна подпись с Network Extension capability." : "VPN mode is unavailable: the app needs a signed build with the Network Extension capability." }
+    var vpnModePermissionDenied: String { isRussian ? "VPN-режим заблокирован macOS: нужен корректно подписанный bundle и provisioning для Packet Tunnel." : "VPN mode is blocked by macOS: a properly signed bundle and provisioning for Packet Tunnel are required." }
+    var vpnModeStartFailed: String { isRussian ? "Packet Tunnel не запустился." : "The Packet Tunnel failed to start." }
+    var runtimeModeTitle: String { isRussian ? "Режим:" : "Mode:" }
+    var runtimeModeVpn: String { isRussian ? "Packet Tunnel VPN" : "Packet Tunnel VPN" }
+    var runtimeModeProxy: String { isRussian ? "Системный proxy" : "System Proxy" }
+    var runtimeModeProxyFallback: String { isRussian ? "Proxy fallback" : "Proxy fallback" }
+    var runtimeModeOff: String { isRussian ? "Остановлен" : "Stopped" }
+    var vpnStatusReady: String { isRussian ? "VPN-контур доступен. При запуске будет использоваться Packet Tunnel." : "The VPN path is available. Packet Tunnel will be used on start." }
+    var vpnStatusFallback: String { isRussian ? "Для этого билда VPN недоступен. При запуске будет использоваться proxy fallback." : "VPN is unavailable for this build. Proxy fallback will be used on start." }
+    var vpnStatusDisabled: String { isRussian ? "Сейчас используется обычный proxy backend." : "The standard proxy backend is active." }
+    var vpnStatusUnavailable: String { isRussian ? "Для этого билда Packet Tunnel недоступен. Нужна подписанная сборка с Network Extension entitlement." : "Packet Tunnel is unavailable for this build. A signed build with the Network Extension entitlement is required." }
+    var vpnSystemExtensionApproval: String { isRussian ? "macOS запросил подтверждение системного расширения. Разрешите DPI Killer в Privacy & Security." : "macOS requires approval for the system extension. Allow DPI Killer in Privacy & Security." }
+    var vpnSystemExtensionReboot: String { isRussian ? "Системное расширение активируется после перезагрузки macOS." : "The system extension will become active after restarting macOS." }
+    var vpnSystemExtensionFailed: String { isRussian ? "Не удалось активировать системное расширение Packet Tunnel." : "Failed to activate the Packet Tunnel system extension." }
 
     var speedTest: String { isRussian ? "Тест скорости" : "Speed Test" }
     var speedTestTitle: String { isRussian ? "Тестирование скорости" : "Speed Testing" }
@@ -134,11 +152,28 @@ struct L10n {
     var tipAutoReconnect: String { isRussian ? "Автоматически восстанавливать прокси при восстановлении WiFi." : "Automatically restore proxy when WiFi connection is restored." }
 
     var sectionCore: String { isRussian ? "Core" : "Core" }
+    var sectionBackend: String { isRussian ? "Движок" : "Backend" }
     var sectionNetwork: String { isRussian ? "Network" : "Network" }
     var sectionDPI: String { isRussian ? "Bypass" : "Bypass" }
     var sectionDNS: String { isRussian ? "DNS" : "DNS" }
     var sectionApp: String { isRussian ? "App" : "App" }
     var sectionManual: String { isRussian ? "Manual" : "Manual" }
+    var spoofdpiMaintenanceTitle: String { isRussian ? "SpoofDPI" : "SpoofDPI" }
+    var spoofdpiSelectedPath: String { isRussian ? "Выбран:" : "Selected:" }
+    var spoofdpiManagedPath: String { isRussian ? "Managed:" : "Managed:" }
+    var spoofdpiVersionTitle: String { isRussian ? "Версия:" : "Version:" }
+    var spoofdpiLatestTitle: String { isRussian ? "Последняя:" : "Latest:" }
+    var spoofdpiCheck: String { isRussian ? "Проверить" : "Check" }
+    var spoofdpiUpdate: String { isRussian ? "Обновить SpoofDPI" : "Update SpoofDPI" }
+    var spoofdpiChecking: String { isRussian ? "Проверка SpoofDPI..." : "Checking SpoofDPI..." }
+    var spoofdpiUpdating: String { isRussian ? "Обновление SpoofDPI..." : "Updating SpoofDPI..." }
+    var spoofdpiReady: String { isRussian ? "SpoofDPI актуален." : "SpoofDPI is up to date." }
+    var spoofdpiUpdateReady: String { isRussian ? "Доступно обновление SpoofDPI." : "SpoofDPI update is available." }
+    var spoofdpiManagedMissing: String { isRussian ? "Managed SpoofDPI не установлен." : "Managed SpoofDPI is not installed." }
+    var spoofdpiUpdated: String { isRussian ? "SpoofDPI обновлен." : "SpoofDPI was updated." }
+    var spoofdpiCheckFailed: String { isRussian ? "Не удалось проверить SpoofDPI." : "Could not check SpoofDPI." }
+    var spoofdpiUpdateFailed: String { isRussian ? "Не удалось обновить SpoofDPI." : "Could not update SpoofDPI." }
+    var versionUnknown: String { isRussian ? "неизвестно" : "unknown" }
 
     var tipBinaryPath: String { isRussian ? "Полный путь к исполняемому файлу ciadpi или spoofdpi." : "Full path to the ciadpi or spoofdpi executable." }
     var tipLocalPort: String { isRussian ? "Порт, который будет слушать локальный прокси (1-65535)." : "Port for the local proxy (1-65535)." }

@@ -1,0 +1,31 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-secheck/Build/Products/Release/DPIKillerTunnel.appex/Contents/MacOS/DPIKillerTunnel'
+relocations:
+  - { offset: 0x8660E, size: 0x8, addend: 0x0, symName: '_$ss5Error_pSgIeghg_So7NSErrorCSgIeyBhy_TR', symObjAddr: 0x0, symBinAddr: 0x100000D98, symSize: 0x50 }
+  - { offset: 0x8678C, size: 0x8, addend: 0x0, symName: '_$sSo7NSErrorCSgIeyBy_s5Error_pSgIegg_TR', symObjAddr: 0xF8, symBinAddr: 0x100000E90, symSize: 0x44 }
+  - { offset: 0x867B6, size: 0x8, addend: 0x0, symName: '_$s15DPIKillerTunnel06PacketB8ProviderCMa', symObjAddr: 0x288, symBinAddr: 0x100001020, symSize: 0x20 }
+  - { offset: 0x867CA, size: 0x8, addend: 0x0, symName: '_$s10Foundation4DataV15_RepresentationOWOe', symObjAddr: 0x2A8, symBinAddr: 0x100001040, symSize: 0x40 }
+  - { offset: 0x868D5, size: 0x8, addend: 0x0, symName: '_$sSo7NSErrorCSgIeyBy_s5Error_pSgIegg_TRTA', symObjAddr: 0xAB8, symBinAddr: 0x100001850, symSize: 0x8 }
+  - { offset: 0x868E9, size: 0x8, addend: 0x0, symName: ___swift_instantiateConcreteTypeFromMangledNameV2, symObjAddr: 0xAC0, symBinAddr: 0x100001858, symSize: 0x50 }
+  - { offset: 0x868FD, size: 0x8, addend: 0x0, symName: '_$sSS_yptWOh', symObjAddr: 0xB10, symBinAddr: 0x1000018A8, symSize: 0x48 }
+  - { offset: 0x86911, size: 0x8, addend: 0x0, symName: _block_copy_helper, symObjAddr: 0xB98, symBinAddr: 0x100001930, symSize: 0x10 }
+  - { offset: 0x86925, size: 0x8, addend: 0x0, symName: _block_destroy_helper, symObjAddr: 0xBA8, symBinAddr: 0x100001940, symSize: 0x8 }
+  - { offset: 0x86939, size: 0x8, addend: 0x0, symName: '_$sSS_yptWOc', symObjAddr: 0xBB0, symBinAddr: 0x100001948, symSize: 0x50 }
+  - { offset: 0x8694D, size: 0x8, addend: 0x0, symName: '_$sypWOb', symObjAddr: 0xC00, symBinAddr: 0x100001998, symSize: 0x10 }
+  - { offset: 0x869AB, size: 0x8, addend: 0x0, symName: '_$sSD17dictionaryLiteralSDyxq_Gx_q_td_tcfCSS_ypTt0g5Tf4g_n', symObjAddr: 0x2E8, symBinAddr: 0x100001080, symSize: 0x10C }
+  - { offset: 0x86B8C, size: 0x8, addend: 0x0, symName: '_$s15DPIKillerTunnel06PacketB8ProviderC05startB07options17completionHandlerySDySSSo8NSObjectCGSg_ys5Error_pSgctFTo', symObjAddr: 0x50, symBinAddr: 0x100000DE8, symSize: 0xA8 }
+  - { offset: 0x86CFB, size: 0x8, addend: 0x0, symName: '_$s15DPIKillerTunnel06PacketB8ProviderC04stopB04with17completionHandlerySo20NEProviderStopReasonV_yyctFTo', symObjAddr: 0x13C, symBinAddr: 0x100000ED4, symSize: 0x30 }
+  - { offset: 0x86DC0, size: 0x8, addend: 0x0, symName: '_$s15DPIKillerTunnel06PacketB8ProviderC16handleAppMessage_17completionHandlery10Foundation4DataV_yAHSgcSgtFTo', symObjAddr: 0x16C, symBinAddr: 0x100000F04, symSize: 0x78 }
+  - { offset: 0x86E07, size: 0x8, addend: 0x0, symName: '_$s15DPIKillerTunnel06PacketB8ProviderC5sleep17completionHandleryyyc_tFTo', symObjAddr: 0x1E4, symBinAddr: 0x100000F7C, symSize: 0x30 }
+  - { offset: 0x86E47, size: 0x8, addend: 0x0, symName: '_$s15DPIKillerTunnel06PacketB8ProviderC4wakeyyFTo', symObjAddr: 0x214, symBinAddr: 0x100000FAC, symSize: 0x4 }
+  - { offset: 0x86E74, size: 0x8, addend: 0x0, symName: '_$s15DPIKillerTunnel06PacketB8ProviderCACycfcTo', symObjAddr: 0x218, symBinAddr: 0x100000FB0, symSize: 0x3C }
+  - { offset: 0x86EA9, size: 0x8, addend: 0x0, symName: '_$s15DPIKillerTunnel06PacketB8ProviderCfD', symObjAddr: 0x254, symBinAddr: 0x100000FEC, symSize: 0x34 }
+  - { offset: 0x86F97, size: 0x8, addend: 0x0, symName: '_$s15DPIKillerTunnel06PacketB8ProviderC05startB07options17completionHandlerySDySSSo8NSObjectCGSg_ys5Error_pSgctF023$sSo7NSErrorCSgIeyBy_s5J11_pSgIegg_TRSo0M0CSgIeyBy_Tf1ncn_nTf4dng_n', symObjAddr: 0x3F4, symBinAddr: 0x10000118C, symSize: 0x6A0 }
+  - { offset: 0x873D3, size: 0x8, addend: 0x0, symName: '_$ss22__RawDictionaryStorageC4findys10_HashTableV6BucketV6bucket_Sb5foundtxSHRzlFSS_Tg5', symObjAddr: 0x0, symBinAddr: 0x1000019A8, symSize: 0x64 }
+  - { offset: 0x873F6, size: 0x8, addend: 0x0, symName: '_$ss22__RawDictionaryStorageC4findys10_HashTableV6BucketV6bucket_Sb5foundtxSHRzlFSS_Tg5', symObjAddr: 0x0, symBinAddr: 0x1000019A8, symSize: 0x64 }
+  - { offset: 0x87444, size: 0x8, addend: 0x0, symName: '_$ss22__RawDictionaryStorageC4find_9hashValues10_HashTableV6BucketV6bucket_Sb5foundtx_SitSHRzlFSS_Tg5', symObjAddr: 0x64, symBinAddr: 0x100001A0C, symSize: 0xB4 }
+  - { offset: 0x87503, size: 0x8, addend: 0x0, symName: '_$sypWOc', symObjAddr: 0x394, symBinAddr: 0x100001D3C, symSize: 0x3C }
+  - { offset: 0x87517, size: 0x8, addend: 0x0, symName: '_$sypSgWOh', symObjAddr: 0x3D0, symBinAddr: 0x100001D78, symSize: 0x48 }
+  - { offset: 0x87604, size: 0x8, addend: 0x0, symName: '_$s15DPIKillerTunnel0B13ConfigurationV08providerC0ACSgSDySSypGSg_tcfCTf4nd_n', symObjAddr: 0x118, symBinAddr: 0x100001AC0, symSize: 0x27C }
+...

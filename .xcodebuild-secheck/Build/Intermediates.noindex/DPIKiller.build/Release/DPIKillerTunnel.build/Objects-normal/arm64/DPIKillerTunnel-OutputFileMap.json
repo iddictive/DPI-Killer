@@ -1,0 +1,21 @@
+{
+  "" : {
+    "const-values" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-secheck/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKillerTunnel.build/Objects-normal/arm64/DPIKillerTunnel-primary.swiftconstvalues",
+    "dependencies" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-secheck/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKillerTunnel.build/Objects-normal/arm64/DPIKillerTunnel-primary.d",
+    "diagnostics" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-secheck/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKillerTunnel.build/Objects-normal/arm64/DPIKillerTunnel-primary.dia",
+    "emit-module-dependencies" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-secheck/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKillerTunnel.build/Objects-normal/arm64/DPIKillerTunnel-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-secheck/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKillerTunnel.build/Objects-normal/arm64/DPIKillerTunnel-primary-emit-module.dia",
+    "pch" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-secheck/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKillerTunnel.build/Objects-normal/arm64/DPIKillerTunnel-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-secheck/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKillerTunnel.build/Objects-normal/arm64/DPIKillerTunnel-primary.swiftdeps"
+  },
+  "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/Extensions/PacketTunnel/Sources/PacketTunnelProvider.swift" : {
+    "index-unit-output-path" : "/DPIKiller.build/Release/DPIKillerTunnel.build/Objects-normal/arm64/PacketTunnelProvider.o",
+    "llvm-bc" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-secheck/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKillerTunnel.build/Objects-normal/arm64/PacketTunnelProvider.bc",
+    "object" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-secheck/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKillerTunnel.build/Objects-normal/arm64/PacketTunnelProvider.o"
+  },
+  "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/Sources/Shared/TunnelConfiguration.swift" : {
+    "index-unit-output-path" : "/DPIKiller.build/Release/DPIKillerTunnel.build/Objects-normal/arm64/TunnelConfiguration.o",
+    "llvm-bc" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-secheck/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKillerTunnel.build/Objects-normal/arm64/TunnelConfiguration.bc",
+    "object" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-secheck/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKillerTunnel.build/Objects-normal/arm64/TunnelConfiguration.o"
+  }
+}

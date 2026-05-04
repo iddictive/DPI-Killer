@@ -27,6 +27,7 @@ It is a **GoodbyeDPI Mac alternative** that restores access to YouTube and block
 - **Auto-Install**: Builds lightweight `ciadpi` automatically and installs official `spoofdpi` as fallback.
 - **Auto-Reconnect**: Restores the backend after connectivity drops when enabled.
 - **Proxy-Aware**: Uses `SOCKS5` for `ciadpi` and `HTTP` proxy mode for `spoofdpi`.
+- **VPN Foundation**: Includes Packet Tunnel + System Extension scaffolding, activation path, and safe fallback when Apple signing is unavailable.
 - **Ultra-Lightweight**: Zero-log silent operation for 0.1% CPU and minimal RAM usage.
 - **Clean State**: Automatically kills orphan processes to prevent conflicts.
 - **Advanced Settings**: Configure backend, TTL, proxy port, DNS behavior, and manual flags.
@@ -67,6 +68,7 @@ curl -sL https://raw.githubusercontent.com/iddictive/DPI-Killer/main/scripts/uni
 - **Auto-установка**: Сам соберёт лёгкий `ciadpi` и установит официальный `spoofdpi` как fallback.
 - **Авто-реконнект**: Может восстановить backend после пропадания сети.
 - **Корректный proxy-режим**: Для `ciadpi` использует `SOCKS5`, для `spoofdpi` — `HTTP` proxy.
+- **Основа для VPN/TUN**: В репе уже есть Packet Tunnel, System Extension activation path и безопасный fallback, если Apple signing ещё не готов.
 - **Максимальная легкость**: Работает бесшумно без записи логов, потребляя ~0.1% CPU и минимум RAM.
 - **Чистый запуск**: Автоматически завершает старые backend-процессы для избежания конфликтов.
 - **Расширенные настройки**: Backend, TTL, порт, DNS-поведение и ручные флаги.

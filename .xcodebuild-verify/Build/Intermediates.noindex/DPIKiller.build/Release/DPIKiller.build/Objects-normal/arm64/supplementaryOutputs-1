@@ -1,0 +1,12 @@
+{
+  "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/Sources/App/AppDelegate.swift" : {
+    "abi-baseline-json" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-verify/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/DPIKiller.abi.json",
+    "const-values" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-verify/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/DPIKiller-primary.swiftconstvalues",
+    "dependencies" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-verify/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/DPIKiller-primary.d",
+    "diagnostics" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-verify/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/DPIKiller-primary.dia",
+    "objc-header" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-verify/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/DPIKiller-Swift.h",
+    "swiftdoc" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-verify/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/DPIKiller.swiftdoc",
+    "swiftmodule" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-verify/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/DPIKiller.swiftmodule",
+    "swiftsourceinfo" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-verify/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/DPIKiller.swiftsourceinfo"
+  }
+}

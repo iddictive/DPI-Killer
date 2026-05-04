@@ -1,5 +1,6 @@
 import Cocoa
 import Foundation
+import SwiftUI
 import WebKit
 
 struct ArgumentOption {
@@ -24,76 +25,12 @@ final class FixedSizeWindow: NSWindow {
     }
 }
 
-final class SettingsSectionView: NSView {
-    let stack = NSStackView()
-
-    init(title: String, subtitle: String? = nil) {
-        super.init(frame: .zero)
-        translatesAutoresizingMaskIntoConstraints = false
-        wantsLayer = true
-        layer?.cornerRadius = 14
-        layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.32).cgColor
-        layer?.borderWidth = 1
-        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.16).cgColor
-
-        stack.orientation = .vertical
-        stack.spacing = 12
-        stack.alignment = .leading
-        addSubview(stack)
-        stack.fill(parent: self, padding: 14)
-
-        let headerStack = NSStackView()
-        headerStack.orientation = .vertical
-        headerStack.spacing = 3
-        headerStack.alignment = .leading
-        headerStack.addArrangedSubview(AppTheme.makeSectionTitle(title))
-        if let subtitle, !subtitle.isEmpty {
-            headerStack.addArrangedSubview(AppTheme.makeSecondaryText(subtitle))
-        }
-
-        stack.addArrangedSubview(headerStack)
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-}
-
 final class SettingsWindowController: NSWindowController {
-    private static let defaultContentSize = NSSize(width: 620, height: 580)
+    private static let defaultContentSize = NSSize(width: 780, height: 580)
 
-    private let formLabelWidth: CGFloat = 124
     private let fixedContentSize = SettingsWindowController.defaultContentSize
-
-    var pathField: NSTextField!
-    var backendModeButton: NSPopUpButton!
-    var backendSummaryLabel: NSTextField!
-    var backendPathHintLabel: NSTextField!
-    var manualArgsField: NSTextField!
-    var ttlField: NSTextField!
-    var splitModeButton: NSPopUpButton!
-    var httpsDisorderButton: NSButton!
-    var httpsFakeCountField: NSTextField!
-    var httpsChunkSizeField: NSTextField!
-    var portField: NSTextField!
-    var dnsAddrField: NSTextField!
-    var dnsModeButton: NSPopUpButton!
-    var dnsHttpsUrlField: NSTextField!
-    var dnsHintLabel: NSTextField!
-    var hotspotStatusLabel: NSTextField!
-    var hotspotFixButton: NSButton!
-    var checkboxes: [NSButton] = []
-    var optionButtons: [String: NSButton] = [:]
-    var optionRows: [String: NSView] = [:]
-    var dnsControls: [NSControl] = []
-
-    let options = [
-        ArgumentOption(flag: "--system-proxy", description: L10n.shared.descSystemProxy),
-        ArgumentOption(flag: "--silent", description: L10n.shared.descSilent),
-        ArgumentOption(flag: "--dns-ipv4-only", description: L10n.shared.descIpv4Only),
-        ArgumentOption(flag: "--debug", description: L10n.shared.descDebug),
-        ArgumentOption(flag: "--policy-auto", description: L10n.shared.descPolicyAuto)
-    ]
+    private var hostingController: NSHostingController<SettingsView>?
+    private let model = SettingsViewModel()
 
     convenience init() {
         let window = FixedSizeWindow(
@@ -104,21 +41,23 @@ final class SettingsWindowController: NSWindowController {
         )
         window.center()
         window.title = L10n.shared.settingsTitle
-        AppTheme.styleWindow(window, minSize: SettingsWindowController.defaultContentSize)
+        AppTheme.styleSettingsWindow(window, minSize: SettingsWindowController.defaultContentSize)
         window.fixedFrameSize = window.frameRect(
             forContentRect: NSRect(origin: .zero, size: SettingsWindowController.defaultContentSize)
         ).size
         self.init(window: window)
         enforceFixedWindowSize(center: true)
-        setupUI()
+        setupSwiftUI()
     }
 
     override func showWindow(_ sender: Any?) {
         let shouldCenter = window?.isVisible != true
+        model.refreshRuntimeStatus()
         super.showWindow(sender)
         enforceFixedWindowSize(center: shouldCenter)
         DispatchQueue.main.async { [weak self] in
             self?.enforceFixedWindowSize(center: false)
+            self?.model.refreshRuntimeStatus()
         }
         window?.level = .normal
     }
@@ -133,581 +72,27 @@ final class SettingsWindowController: NSWindowController {
         window.standardWindowButton(.zoomButton)?.isEnabled = false
         window.standardWindowButton(.zoomButton)?.isHidden = true
 
-        let targetFrame = NSRect(origin: .zero, size: frameSize)
         let currentOrigin = center ? NSPoint(x: window.frame.origin.x, y: window.frame.origin.y) : window.frame.origin
-        let frame = NSRect(origin: currentOrigin, size: targetFrame.size)
-        window.setFrame(frame, display: false)
+        window.setFrame(NSRect(origin: currentOrigin, size: frameSize), display: false)
         window.setContentSize(fixedContentSize)
         if center {
             window.center()
         }
     }
 
-    func setupUI() {
-        let background = AppTheme.makeWindowBackground()
-        window?.contentView = background
-
-        let rootStack = NSStackView()
-        rootStack.orientation = .vertical
-        rootStack.spacing = 12
-        rootStack.alignment = .leading
-        background.addSubview(rootStack)
-        rootStack.fill(parent: background, padding: 16)
-
-        let scrollView = NSScrollView()
-        scrollView.drawsBackground = false
-        scrollView.hasVerticalScroller = true
-        scrollView.autohidesScrollers = true
-        scrollView.borderType = .noBorder
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
-        scrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: 360).isActive = true
-
-        let footerStack = NSStackView()
-        footerStack.orientation = .horizontal
-        footerStack.spacing = 10
-        footerStack.alignment = .centerY
-
-        let cancelBtn = NSButton(title: L10n.shared.cancel, target: self, action: #selector(cancelAction))
-        AppTheme.styleSecondaryButton(cancelBtn)
-
-        let saveButton = NSButton(title: L10n.shared.saveAndRestart, target: self, action: #selector(save))
-        saveButton.keyEquivalent = "\r"
-        AppTheme.stylePrimaryButton(saveButton)
-
-        footerStack.addArrangedSubview(NSView())
-        footerStack.addArrangedSubview(cancelBtn)
-        footerStack.addArrangedSubview(saveButton)
-
-        let contentView = NSView()
-        contentView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.documentView = contentView
-
-        let mainStack = NSStackView()
-        mainStack.orientation = .vertical
-        mainStack.spacing = 16
-        mainStack.alignment = .leading
-        contentView.addSubview(mainStack)
-        mainStack.translatesAutoresizingMaskIntoConstraints = false
-        rootStack.addArrangedSubview(scrollView)
-        let footerSeparator = AppTheme.makeSeparator()
-        rootStack.addArrangedSubview(footerSeparator)
-        rootStack.addArrangedSubview(footerStack)
-
-        NSLayoutConstraint.activate([
-            scrollView.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
-            footerSeparator.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
-            footerStack.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
-
-            contentView.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
-            contentView.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
-            contentView.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
-            contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
-            contentView.heightAnchor.constraint(greaterThanOrEqualTo: scrollView.contentView.heightAnchor),
-
-            mainStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
-            mainStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            mainStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            mainStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12)
-        ])
-
-        func addSection(_ section: NSView) {
-            mainStack.addArrangedSubview(section)
-            section.widthAnchor.constraint(equalTo: mainStack.widthAnchor).isActive = true
-        }
-
-        let coreSection = createSection(
-            title: L10n.shared.sectionCore,
-            subtitle: L10n.shared.isRussian
-                ? "Выбор backend-а и базовая конфигурация запуска."
-                : "Backend selection and launch configuration."
-        )
-        backendModeButton = themedPopup(
-            items: [
-                L10n.shared.backendAuto,
-                L10n.shared.backendCiadpi,
-                L10n.shared.backendSpoofdpi,
-                L10n.shared.backendCustom
-            ],
-            selected: localizedBackendTitle(for: SettingsStore.shared.backendSelection)
-        )
-        backendModeButton.target = self
-        backendModeButton.action = #selector(backendSelectionChanged)
-        addRow(label: L10n.shared.backendModeTitle, control: backendModeButton, to: coreSection.stack)
-
-        backendSummaryLabel = AppTheme.makeSecondaryText("")
-        addRow(label: L10n.shared.backendSummaryTitle, control: backendSummaryLabel, to: coreSection.stack)
-
-        pathField = themedTextField(value: SettingsStore.shared.binaryPath, placeholder: L10n.shared.binaryPlaceholder)
-        addRow(label: L10n.shared.binaryPathCustom, control: pathField, to: coreSection.stack, tooltip: L10n.shared.tipBinaryPath)
-
-        backendPathHintLabel = AppTheme.makeSecondaryText(L10n.shared.backendPathHint)
-        addIndentedRow(content: backendPathHintLabel, to: coreSection.stack)
-        addSection(coreSection)
-
-        let networkSection = createSection(
-            title: L10n.shared.sectionNetwork,
-            subtitle: L10n.shared.isRussian
-                ? "Порт, статус хотспота и быстрые действия."
-                : "Port, hotspot status, and quick actions."
-        )
-        hotspotStatusLabel = NSTextField(labelWithString: L10n.shared.diagChecking)
-        hotspotStatusLabel.font = .systemFont(ofSize: 12, weight: .semibold)
-        addRow(label: L10n.shared.hotspotStatusTitle, control: hotspotStatusLabel, to: networkSection.stack)
-
-        let hotspotActions = NSStackView()
-        hotspotActions.orientation = .horizontal
-        hotspotActions.spacing = 12
-        hotspotActions.alignment = .centerY
-        hotspotFixButton = NSButton(title: L10n.shared.fixHotspotButton, target: self, action: #selector(fixHotspotAction))
-        AppTheme.styleSecondaryButton(hotspotFixButton)
-        hotspotFixButton.isHidden = true
-
-        let presetBtn = NSButton(title: L10n.shared.mobilePresetTitle, target: self, action: #selector(applyMobilePreset))
-        AppTheme.stylePrimaryButton(presetBtn)
-        hotspotActions.addArrangedSubview(hotspotFixButton)
-        hotspotActions.addArrangedSubview(presetBtn)
-        addIndentedRow(content: hotspotActions, to: networkSection.stack)
-
-        portField = themedTextField(value: SettingsStore.shared.localPort, placeholder: L10n.shared.portPlaceholder, width: 120)
-        addRow(label: L10n.shared.portTitle, control: portField, to: networkSection.stack, tooltip: L10n.shared.tipLocalPort)
-        addSection(networkSection)
-        updateHotspotStatus()
-
-        let dpiSection = createSection(
-            title: L10n.shared.sectionDPI,
-            subtitle: L10n.shared.isRussian
-                ? "Основные флаги и параметры обхода DPI."
-                : "Primary DPI bypass flags and tuning."
-        )
-        let selected = SettingsStore.shared.selectedFlags
-        for option in options {
-            let cb = NSButton(checkboxWithTitle: option.flag, target: nil, action: nil)
-            cb.state = selected.contains(option.flag) ? .on : .off
-            cb.font = .systemFont(ofSize: 13, weight: .regular)
-            checkboxes.append(cb)
-            optionButtons[option.flag] = cb
-
-            let optionStack = NSStackView()
-            optionStack.orientation = .vertical
-            optionStack.spacing = 3
-            optionStack.alignment = .leading
-            optionStack.addArrangedSubview(cb)
-
-            let desc = NSTextField(wrappingLabelWithString: option.description)
-            desc.font = .systemFont(ofSize: 12, weight: .regular)
-            desc.textColor = AppTheme.textSecondary
-            let descContainer = NSView()
-            descContainer.translatesAutoresizingMaskIntoConstraints = false
-            descContainer.addSubview(desc)
-            desc.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                desc.topAnchor.constraint(equalTo: descContainer.topAnchor),
-                desc.leadingAnchor.constraint(equalTo: descContainer.leadingAnchor, constant: 18),
-                desc.trailingAnchor.constraint(equalTo: descContainer.trailingAnchor),
-                desc.bottomAnchor.constraint(equalTo: descContainer.bottomAnchor)
-            ])
-            optionStack.addArrangedSubview(descContainer)
-            addToggleRow(content: optionStack, to: dpiSection.stack)
-            optionRows[option.flag] = optionStack
-        }
-
-        ttlField = themedTextField(value: SettingsStore.shared.defaultTTL, placeholder: L10n.shared.ttlPlaceholder, width: 90)
-        addRow(label: L10n.shared.ttlTitle, control: ttlField, to: dpiSection.stack, tooltip: L10n.shared.tipTTL)
-
-        splitModeButton = themedPopup(items: ["sni", "random", "chunk", "none"], selected: SettingsStore.shared.splitMode)
-        addRow(label: L10n.shared.splitModeTitle, control: splitModeButton, to: dpiSection.stack, tooltip: L10n.shared.tipSplitMode)
-
-        let disorderStack = NSStackView()
-        disorderStack.orientation = .horizontal
-        disorderStack.spacing = 12
-        disorderStack.alignment = .centerY
-
-        httpsDisorderButton = NSButton(checkboxWithTitle: L10n.shared.httpsDisorder, target: nil, action: nil)
-        httpsDisorderButton.state = SettingsStore.shared.httpsDisorder ? .on : .off
-        httpsDisorderButton.font = .systemFont(ofSize: 13, weight: .regular)
-        disorderStack.addArrangedSubview(httpsDisorderButton)
-
-        let fakeLabel = NSTextField(labelWithString: L10n.shared.httpsFakeCount)
-        fakeLabel.font = .systemFont(ofSize: 12, weight: .medium)
-        fakeLabel.textColor = AppTheme.textSecondary
-        httpsFakeCountField = themedTextField(value: SettingsStore.shared.httpsFakeCount, placeholder: "0", width: 68)
-
-        let fakeStack = NSStackView()
-        fakeStack.orientation = .horizontal
-        fakeStack.spacing = 8
-        fakeStack.alignment = .centerY
-        fakeStack.addArrangedSubview(fakeLabel)
-        fakeStack.addArrangedSubview(httpsFakeCountField)
-        disorderStack.addArrangedSubview(fakeStack)
-        addToggleRow(content: disorderStack, to: dpiSection.stack)
-
-        httpsChunkSizeField = themedTextField(value: SettingsStore.shared.httpsChunkSize, placeholder: L10n.shared.httpsChunkPlaceholder, width: 90)
-        addRow(label: L10n.shared.httpsChunkSize, control: httpsChunkSizeField, to: dpiSection.stack, tooltip: L10n.shared.tipChunkSize)
-        addSection(dpiSection)
-
-        let dnsSection = createSection(
-            title: L10n.shared.sectionDNS,
-            subtitle: L10n.shared.isRussian
-                ? "Настройки DNS и DoH."
-                : "DNS resolver and DoH settings."
-        )
-        dnsHintLabel = AppTheme.makeSecondaryText(L10n.shared.dnsDisabledForCiadpi)
-        dnsSection.stack.addArrangedSubview(dnsHintLabel)
-
-        dnsAddrField = themedTextField(value: SettingsStore.shared.dnsAddr, placeholder: "8.8.8.8:53")
-        addRow(label: L10n.shared.dnsAddrTitle, control: dnsAddrField, to: dnsSection.stack, tooltip: L10n.shared.tipDNSAddr)
-        dnsControls.append(dnsAddrField)
-
-        dnsModeButton = themedPopup(items: ["udp", "https", "system"], selected: SettingsStore.shared.dnsMode)
-        addRow(label: L10n.shared.dnsModeTitle, control: dnsModeButton, to: dnsSection.stack, tooltip: L10n.shared.tipDNSSystem)
-        dnsControls.append(dnsModeButton)
-
-        dnsHttpsUrlField = themedTextField(value: SettingsStore.shared.dnsHttpsUrl, placeholder: "https://dns.google/dns-query")
-        addRow(label: "DoH URL", control: dnsHttpsUrlField, to: dnsSection.stack)
-        dnsControls.append(dnsHttpsUrlField)
-        addSection(dnsSection)
-
-        let appSection = createSection(
-            title: L10n.shared.sectionApp,
-            subtitle: L10n.shared.isRussian
-                ? "Поведение приложения и автодействия."
-                : "App behavior and automation."
-        )
-        let loginCb = NSButton(checkboxWithTitle: L10n.shared.launchAtLogin, target: self, action: #selector(toggleLoginItem))
-        loginCb.state = SettingsStore.shared.launchAtLogin ? .on : .off
-        addCheckboxRow(button: loginCb, to: appSection.stack)
-
-        let updateCb = NSButton(checkboxWithTitle: L10n.shared.autoUpdateToggle, target: self, action: #selector(toggleUpdateItem))
-        updateCb.state = SettingsStore.shared.autoUpdate ? .on : .off
-        addCheckboxRow(button: updateCb, to: appSection.stack)
-
-        let autoDownloadCb = NSButton(checkboxWithTitle: L10n.shared.autoDownloadToggle, target: self, action: #selector(toggleDownloadItem))
-        autoDownloadCb.state = SettingsStore.shared.autoDownload ? .on : .off
-        addCheckboxRow(button: autoDownloadCb, to: appSection.stack)
-
-        let ipv6Cb = NSButton(checkboxWithTitle: L10n.shared.disableIpv6, target: self, action: #selector(toggleIpv6))
-        ipv6Cb.state = SettingsStore.shared.disableIpv6 ? .on : .off
-        addCheckboxRow(button: ipv6Cb, to: appSection.stack)
-
-        let reconnectCb = NSButton(checkboxWithTitle: L10n.shared.autoReconnect, target: self, action: #selector(toggleReconnect))
-        reconnectCb.state = SettingsStore.shared.autoReconnect ? .on : .off
-        reconnectCb.toolTip = L10n.shared.tipAutoReconnect
-        addCheckboxRow(button: reconnectCb, to: appSection.stack)
-        addSection(appSection)
-
-        let manualSection = createSection(
-            title: L10n.shared.sectionManual,
-            subtitle: L10n.shared.isRussian
-                ? "Ручные аргументы для редких случаев."
-                : "Manual arguments for edge cases."
-        )
-        manualArgsField = themedTextField(value: manualArgsValue(), placeholder: L10n.shared.manualArgsPlaceholder)
-        manualSection.stack.addArrangedSubview(manualArgsField)
-        manualArgsField.widthAnchor.constraint(equalTo: manualSection.stack.widthAnchor).isActive = true
-        addSection(manualSection)
-
-        refreshBackendUI()
-    }
-
-    private func createSection(title: String, subtitle: String? = nil) -> SettingsSectionView {
-        SettingsSectionView(title: title, subtitle: subtitle)
-    }
-
-    private func themedTextField(value: String, placeholder: String, width: CGFloat? = nil) -> NSTextField {
-        let field = NSTextField()
-        field.stringValue = value
-        field.placeholderString = placeholder
-        AppTheme.styleInput(field)
-        field.translatesAutoresizingMaskIntoConstraints = false
-        if let width {
-            field.widthAnchor.constraint(equalToConstant: width).isActive = true
-        }
-        return field
-    }
-
-    private func themedPopup(items: [String], selected: String) -> NSPopUpButton {
-        let popup = NSPopUpButton(frame: .zero, pullsDown: false)
-        popup.addItems(withTitles: items)
-        popup.selectItem(withTitle: selected)
-        AppTheme.styleInput(popup)
-        popup.translatesAutoresizingMaskIntoConstraints = false
-        return popup
-    }
-
-    private func localizedBackendTitle(for selection: BackendSelection) -> String {
-        switch selection {
-        case .automatic:
-            return L10n.shared.backendAuto
-        case .ciadpi:
-            return L10n.shared.backendCiadpi
-        case .spoofdpi:
-            return L10n.shared.backendSpoofdpi
-        case .custom:
-            return L10n.shared.backendCustom
-        }
-    }
-
-    private func selectedBackendSelection() -> BackendSelection {
-        switch backendModeButton.titleOfSelectedItem {
-        case L10n.shared.backendCiadpi:
-            return .ciadpi
-        case L10n.shared.backendSpoofdpi:
-            return .spoofdpi
-        case L10n.shared.backendCustom:
-            return .custom
-        default:
-            return .automatic
-        }
-    }
-
-    private func resolvedBackendPath() -> String {
-        SettingsStore.shared.resolvedBinaryPath(
-            for: selectedBackendSelection(),
-            customPath: pathField?.stringValue
-        )
-    }
-
-    private func refreshBackendUI() {
-        guard backendModeButton != nil, pathField != nil else { return }
-
-        let selection = selectedBackendSelection()
-        let resolvedPath = resolvedBackendPath()
-        let engine = SettingsStore.shared.currentEngine(for: resolvedPath)
-        let isCustom = selection == .custom
-        let isSpoofdpi = engine == .spoofdpi
-
-        pathField.stringValue = resolvedPath
-        pathField.isEditable = isCustom
-        pathField.isEnabled = isCustom
-        pathField.textColor = isCustom ? AppTheme.textPrimary : AppTheme.textSecondary
-        pathField.backgroundColor = isCustom ? .controlBackgroundColor : .quaternaryLabelColor.withAlphaComponent(0.08)
-
-        let pathState = FileManager.default.fileExists(atPath: resolvedPath)
-            ? URL(fileURLWithPath: resolvedPath).lastPathComponent
-            : L10n.shared.backendMissingSuffix
-        backendSummaryLabel.stringValue = "\(engine.displayName) • \(engine.proxyDescription) • \(pathState)"
-
-        backendPathHintLabel.isHidden = isCustom
-        dnsHintLabel.isHidden = isSpoofdpi
-        dnsControls.forEach {
-            $0.isEnabled = isSpoofdpi
-            $0.alphaValue = isSpoofdpi ? 1 : 0.55
-        }
-
-        let unsupportedFlags: Set<String>
-        if isSpoofdpi {
-            unsupportedFlags = ["--policy-auto"]
-        } else {
-            unsupportedFlags = ["--silent", "--dns-ipv4-only", "--debug"]
-        }
-        for option in options {
-            let enabled = !unsupportedFlags.contains(option.flag)
-            optionButtons[option.flag]?.isEnabled = enabled
-            optionRows[option.flag]?.alphaValue = enabled ? 1 : 0.45
-        }
-
-        manualArgsField.placeholderString = isSpoofdpi
-            ? L10n.shared.manualArgsPlaceholderSpoofdpi
-            : L10n.shared.manualArgsPlaceholderCiadpi
-    }
-
-    private func addRow(label: String, control: NSView, to stack: NSStackView, tooltip: String? = nil) {
-        let row = NSStackView()
-        row.orientation = .horizontal
-        row.alignment = .centerY
-        row.spacing = 12
-
-        let labelView = NSTextField(labelWithString: label)
-        labelView.font = .systemFont(ofSize: 12, weight: .medium)
-        labelView.textColor = AppTheme.textSecondary
-        labelView.alignment = .right
-        labelView.translatesAutoresizingMaskIntoConstraints = false
-        labelView.widthAnchor.constraint(equalToConstant: formLabelWidth).isActive = true
-
-        if let tooltip {
-            control.toolTip = tooltip
-        }
-
-        control.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        control.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        row.addArrangedSubview(labelView)
-        row.addArrangedSubview(control)
-        stack.addArrangedSubview(row)
-        row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
-    }
-
-    private func addIndentedRow(content: NSView, to stack: NSStackView) {
-        addInsetRow(content: content, to: stack, leadingInset: formLabelWidth)
-    }
-
-    private func addToggleRow(content: NSView, to stack: NSStackView) {
-        addInsetRow(content: content, to: stack, leadingInset: 18)
-    }
-
-    private func addInsetRow(content: NSView, to stack: NSStackView, leadingInset: CGFloat) {
-        let row = NSStackView()
-        row.orientation = .horizontal
-        row.spacing = 12
-        row.alignment = .top
-
-        let spacer = NSView()
-        spacer.translatesAutoresizingMaskIntoConstraints = false
-        spacer.widthAnchor.constraint(equalToConstant: leadingInset).isActive = true
-
-        content.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        content.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
-        row.addArrangedSubview(spacer)
-        row.addArrangedSubview(content)
-        stack.addArrangedSubview(row)
-        row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
-    }
-
-    private func addCheckboxRow(button: NSButton, to stack: NSStackView) {
-        button.font = .systemFont(ofSize: 13, weight: .regular)
-        addToggleRow(content: button, to: stack)
-    }
-
-    private func manualArgsValue() -> String {
-        SettingsStore.shared.manualArgsString(for: pathField?.stringValue)
-    }
-
-    @objc func backendSelectionChanged() {
-        refreshBackendUI()
-    }
-
-    @objc func cancelAction() {
-        window?.close()
-    }
-
-    @objc func applyMobilePreset() {
-        ttlField.stringValue = "128"
-        splitModeButton.selectItem(withTitle: "random")
-        httpsChunkSizeField.stringValue = "20"
-        httpsDisorderButton.state = .on
-        httpsFakeCountField.stringValue = "0"
-        if getSystemTTL() != 65 {
-            fixHotspotAction()
-        }
-    }
-
-    @objc func fixHotspotAction() {
-        let script = "do shell script \"sysctl -w net.inet.ip.ttl=65 && sysctl -w net.inet6.ip6.hlim=65\" with administrator privileges"
-        let appleScript = NSAppleScript(source: script)
-        var error: NSDictionary?
-        appleScript?.executeAndReturnError(&error)
-
-        if let error {
-            AppLogger.log("AppleScript Error: \(error)")
-            let alert = NSAlert()
-            alert.messageText = L10n.shared.fixHotspotFailed
-            alert.informativeText = "\(error["NSAppleScriptErrorMessage"] ?? "Unknown error")"
-            alert.runModal()
-        } else {
-            updateHotspotStatus()
-            (NSApp.delegate as? AppDelegate)?.refreshUI()
-        }
-    }
-
-    func updateHotspotStatus() {
-        let ttl = getSystemTTL()
-        if ttl == 65 {
-            hotspotStatusLabel.stringValue = L10n.shared.hotspotStatusOptimized
-            hotspotStatusLabel.textColor = AppTheme.success
-            hotspotFixButton.isHidden = true
-        } else {
-            hotspotStatusLabel.stringValue = L10n.shared.hotspotStatusThrottled
-            hotspotStatusLabel.textColor = AppTheme.warning
-            hotspotFixButton.isHidden = false
-        }
-    }
-
-    func getSystemTTL() -> Int {
-        let task = Process()
-        task.launchPath = "/usr/sbin/sysctl"
-        task.arguments = ["-n", "net.inet.ip.ttl"]
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        do {
-            try task.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            if let output = String(data: data, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines),
-               let value = Int(output) {
-                return value
+    private func setupSwiftUI() {
+        let rootView = SettingsView(viewModel: model, onCancel: { [weak self] in
+            self?.window?.close()
+        }, onSave: { [weak self] in
+            guard let self else { return }
+            if DPIKillerManager.shared.isRunning {
+                (NSApp.delegate as? AppDelegate)?.restartRuntime()
             }
-        } catch {
-            return 64
-        }
-        return 64
-    }
-
-    @objc func toggleLoginItem(_ sender: NSButton) {
-        SettingsStore.shared.launchAtLogin = sender.state == .on
-    }
-
-    @objc func toggleDownloadItem(_ sender: NSButton) {
-        SettingsStore.shared.autoDownload = sender.state == .on
-    }
-
-    @objc func toggleUpdateItem(_ sender: NSButton) {
-        SettingsStore.shared.autoUpdate = sender.state == .on
-    }
-
-    @objc func toggleReconnect(_ sender: NSButton) {
-        SettingsStore.shared.autoReconnect = sender.state == .on
-    }
-
-    @objc func toggleIpv6(_ sender: NSButton) {
-        SettingsStore.shared.disableIpv6 = sender.state == .on
-    }
-
-    @objc func save() {
-        var flags = Set<String>()
-        for (index, checkbox) in checkboxes.enumerated() where checkbox.state == .on {
-            flags.insert(options[index].flag)
-        }
-
-        let clampedPort = (Int(portField.stringValue.trimmingCharacters(in: .whitespaces)) ?? 8080).clamped(to: 1...65535)
-        let clampedTTL = (Int(ttlField.stringValue.trimmingCharacters(in: .whitespaces)) ?? 128).clamped(to: 1...255)
-        let clampedFakeCount = (Int(httpsFakeCountField.stringValue.trimmingCharacters(in: .whitespaces)) ?? 0).clamped(to: 0...100)
-        let clampedChunkSize = (Int(httpsChunkSizeField.stringValue.trimmingCharacters(in: .whitespaces)) ?? 100).clamped(to: 1...1000)
-
-        let backendSelection = selectedBackendSelection()
-        SettingsStore.shared.applyBackendSelection(backendSelection, customPath: pathField.stringValue)
-        SettingsStore.shared.defaultTTL = String(clampedTTL)
-        SettingsStore.shared.splitMode = splitModeButton.titleOfSelectedItem ?? "sni"
-        SettingsStore.shared.httpsDisorder = httpsDisorderButton.state == .on
-        SettingsStore.shared.httpsFakeCount = String(clampedFakeCount)
-        SettingsStore.shared.httpsChunkSize = String(clampedChunkSize)
-        SettingsStore.shared.localPort = String(clampedPort)
-        SettingsStore.shared.dnsAddr = dnsAddrField.stringValue.trimmingCharacters(in: .whitespaces)
-        SettingsStore.shared.dnsMode = dnsModeButton.titleOfSelectedItem ?? "udp"
-        SettingsStore.shared.dnsHttpsUrl = dnsHttpsUrlField.stringValue.trimmingCharacters(in: .whitespaces)
-
-        SettingsStore.shared.updateArgs(
-            with: flags,
-            manual: manualArgsField.stringValue,
-            ttl: SettingsStore.shared.defaultTTL,
-            splitMode: SettingsStore.shared.splitMode,
-            splitPos: "1",
-            port: SettingsStore.shared.localPort,
-            dnsAddr: SettingsStore.shared.dnsAddr,
-            dnsMode: SettingsStore.shared.dnsMode,
-            dnsHttpsUrl: SettingsStore.shared.dnsHttpsUrl
-        )
-
-        if DPIKillerManager.shared.isRunning {
-            DPIKillerManager.shared.stop()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                DPIKillerManager.shared.start { _, _ in
-                    (NSApp.delegate as? AppDelegate)?.refreshUI()
-                }
-            }
-        }
-
-        window?.close()
+            self.window?.close()
+        })
+        let hostingController = NSHostingController(rootView: rootView)
+        self.hostingController = hostingController
+        window?.contentViewController = hostingController
     }
 }
 
@@ -1145,7 +530,7 @@ final class LoadingWindowController: NSWindowController {
         iconContainer.translatesAutoresizingMaskIntoConstraints = false
         iconContainer.widthAnchor.constraint(equalToConstant: 72).isActive = true
         iconContainer.heightAnchor.constraint(equalToConstant: 72).isActive = true
-        if let icon = NSApp.applicationIconImage {
+        if let icon = DPISettingsAssets.appIcon() {
             let imageView = NSImageView(image: icon)
             imageView.imageScaling = .scaleProportionallyUpOrDown
             imageView.translatesAutoresizingMaskIntoConstraints = false

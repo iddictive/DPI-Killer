@@ -1,0 +1,100 @@
+name: DPIKiller
+options:
+  deploymentTarget:
+    macOS: "13.0"
+configs:
+  Debug: debug
+  Release: release
+settings:
+  base:
+    SWIFT_VERSION: 5.0
+    MARKETING_VERSION: 3.0.62
+    CURRENT_PROJECT_VERSION: 62
+targets:
+  DPIKiller:
+    type: application
+    platform: macOS
+    attributes:
+      SystemCapabilities:
+        com.apple.NetworkExtensions:
+          enabled: 1
+    sources:
+      - path: main.swift
+      - path: Sources
+    info:
+      path: Xcode/DPIKiller-Info.plist
+      properties:
+        CFBundleDevelopmentRegion: $(DEVELOPMENT_LANGUAGE)
+        CFBundleExecutable: $(EXECUTABLE_NAME)
+        CFBundleIconFile: AppIcon
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleInfoDictionaryVersion: "6.0"
+        CFBundleName: DPI Killer
+        CFBundlePackageType: APPL
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: "13.0"
+        LSUIElement: true
+    entitlements:
+      path: DPIKiller.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.antigravity.DPIKiller
+        PRODUCT_NAME: DPIKiller
+        INFOPLIST_FILE: Xcode/DPIKiller-Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
+        ENABLE_HARDENED_RUNTIME: NO
+    dependencies:
+      - sdk: AppKit.framework
+      - sdk: WebKit.framework
+      - sdk: Network.framework
+      - sdk: NetworkExtension.framework
+      - sdk: SystemExtensions.framework
+      - target: DPIKillerTunnel
+        embed: true
+
+  DPIKillerTunnel:
+    type: app-extension
+    platform: macOS
+    attributes:
+      SystemCapabilities:
+        com.apple.NetworkExtensions:
+          enabled: 1
+    sources:
+      - path: Extensions/PacketTunnel/Sources
+      - path: Sources/Shared
+    info:
+      path: Extensions/PacketTunnel/Info.plist
+      properties:
+        CFBundleDevelopmentRegion: en
+        CFBundleExecutable: $(EXECUTABLE_NAME)
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleInfoDictionaryVersion: "6.0"
+        CFBundleName: $(PRODUCT_NAME)
+        CFBundlePackageType: XPC!
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: "13.0"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.networkextension.packet-tunnel
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PacketTunnelProvider
+    entitlements:
+      path: Extensions/PacketTunnel/PacketTunnel.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.antigravity.DPIKiller.PacketTunnel
+        PRODUCT_NAME: DPIKillerTunnel
+        INFOPLIST_FILE: Extensions/PacketTunnel/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
+    dependencies:
+      - sdk: Foundation.framework
+      - sdk: NetworkExtension.framework
+
+schemes:
+  DPIKiller:
+    build:
+      targets:
+        DPIKiller: all
+        DPIKillerTunnel: all

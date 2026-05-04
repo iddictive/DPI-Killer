@@ -1,0 +1,81 @@
+{
+  "" : {
+    "const-values" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/DPIKiller-primary.swiftconstvalues",
+    "dependencies" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/DPIKiller-primary.d",
+    "diagnostics" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/DPIKiller-primary.dia",
+    "emit-module-dependencies" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/DPIKiller-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/DPIKiller-primary-emit-module.dia",
+    "pch" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/DPIKiller-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/DPIKiller-primary.swiftdeps"
+  },
+  "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/Sources/App/AppDelegate.swift" : {
+    "index-unit-output-path" : "/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/AppDelegate.o",
+    "llvm-bc" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/AppDelegate.bc",
+    "object" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/AppDelegate.o"
+  },
+  "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/Sources/Core/BypassEngine.swift" : {
+    "index-unit-output-path" : "/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/BypassEngine.o",
+    "llvm-bc" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/BypassEngine.bc",
+    "object" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/BypassEngine.o"
+  },
+  "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/Sources/Core/Localization.swift" : {
+    "index-unit-output-path" : "/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/Localization.o",
+    "llvm-bc" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/Localization.bc",
+    "object" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/Localization.o"
+  },
+  "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/Sources/Core/Logging.swift" : {
+    "index-unit-output-path" : "/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/Logging.o",
+    "llvm-bc" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/Logging.bc",
+    "object" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/Logging.o"
+  },
+  "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/Sources/Core/SettingsStore.swift" : {
+    "index-unit-output-path" : "/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/SettingsStore.o",
+    "llvm-bc" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/SettingsStore.bc",
+    "object" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/SettingsStore.o"
+  },
+  "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/Sources/Services/DPIKillerManager.swift" : {
+    "index-unit-output-path" : "/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/DPIKillerManager.o",
+    "llvm-bc" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/DPIKillerManager.bc",
+    "object" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/DPIKillerManager.o"
+  },
+  "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/Sources/Services/GitHubUpdater.swift" : {
+    "index-unit-output-path" : "/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/GitHubUpdater.o",
+    "llvm-bc" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/GitHubUpdater.bc",
+    "object" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/GitHubUpdater.o"
+  },
+  "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/Sources/Services/Networking.swift" : {
+    "index-unit-output-path" : "/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/Networking.o",
+    "llvm-bc" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/Networking.bc",
+    "object" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/Networking.o"
+  },
+  "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/Sources/Services/SystemExtensionManager.swift" : {
+    "index-unit-output-path" : "/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/SystemExtensionManager.o",
+    "llvm-bc" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/SystemExtensionManager.bc",
+    "object" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/SystemExtensionManager.o"
+  },
+  "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/Sources/Services/TunnelManager.swift" : {
+    "index-unit-output-path" : "/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/TunnelManager.o",
+    "llvm-bc" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/TunnelManager.bc",
+    "object" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/TunnelManager.o"
+  },
+  "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/Sources/Shared/TunnelConfiguration.swift" : {
+    "index-unit-output-path" : "/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/TunnelConfiguration.o",
+    "llvm-bc" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/TunnelConfiguration.bc",
+    "object" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/TunnelConfiguration.o"
+  },
+  "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/Sources/UI/AppTheme.swift" : {
+    "index-unit-output-path" : "/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/AppTheme.o",
+    "llvm-bc" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/AppTheme.bc",
+    "object" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/AppTheme.o"
+  },
+  "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/Sources/UI/Windows.swift" : {
+    "index-unit-output-path" : "/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/Windows.o",
+    "llvm-bc" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/Windows.bc",
+    "object" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/Windows.o"
+  },
+  "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/main.swift" : {
+    "index-unit-output-path" : "/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/main.o",
+    "llvm-bc" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/main.bc",
+    "object" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign/Build/Intermediates.noindex/DPIKiller.build/Release/DPIKiller.build/Objects-normal/arm64/main.o"
+  }
+}

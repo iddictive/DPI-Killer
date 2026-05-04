@@ -9,6 +9,15 @@ enum AppTheme {
     static let textPrimary = NSColor.labelColor
     static let textSecondary = NSColor.secondaryLabelColor
     static let textMuted = NSColor.tertiaryLabelColor
+    static let settingsBackground = NSColor(calibratedRed: 0.090, green: 0.098, blue: 0.118, alpha: 1)
+    static let settingsSidebar = NSColor(calibratedRed: 0.118, green: 0.126, blue: 0.150, alpha: 1)
+    static let settingsSurface = NSColor(calibratedRed: 0.145, green: 0.153, blue: 0.180, alpha: 1)
+    static let settingsSurfaceRaised = NSColor(calibratedRed: 0.172, green: 0.184, blue: 0.216, alpha: 1)
+    static let settingsBorder = NSColor.white.withAlphaComponent(0.08)
+    static let settingsSeparator = NSColor.white.withAlphaComponent(0.07)
+    static let settingsTextPrimary = NSColor(calibratedWhite: 0.94, alpha: 1)
+    static let settingsTextSecondary = NSColor(calibratedWhite: 0.70, alpha: 1)
+    static let settingsTextMuted = NSColor(calibratedWhite: 0.50, alpha: 1)
 
     static func styleWindow(_ window: NSWindow?, minSize: NSSize? = nil) {
         guard let window else { return }
@@ -24,11 +33,32 @@ enum AppTheme {
         }
     }
 
+    static func styleSettingsWindow(_ window: NSWindow?, minSize: NSSize? = nil) {
+        guard let window else { return }
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .visible
+        window.isMovableByWindowBackground = true
+        window.backgroundColor = settingsBackground
+        window.isOpaque = true
+        window.hasShadow = true
+        if let minSize {
+            window.minSize = minSize
+        }
+    }
+
     static func makeWindowBackground(material: NSVisualEffectView.Material = .windowBackground) -> NSVisualEffectView {
         let view = NSVisualEffectView()
         view.material = material
         view.blendingMode = .withinWindow
         view.state = .active
+        return view
+    }
+
+    static func makeSettingsBackground() -> NSView {
+        let view = NSView()
+        view.wantsLayer = true
+        view.layer?.backgroundColor = settingsBackground.cgColor
         return view
     }
 
@@ -69,6 +99,23 @@ enum AppTheme {
         }
     }
 
+    static func styleSettingsInput(_ control: NSControl) {
+        styleInput(control)
+
+        if let textField = control as? NSTextField {
+            textField.backgroundColor = settingsSurfaceRaised
+            textField.textColor = settingsTextPrimary
+            textField.placeholderAttributedString = NSAttributedString(
+                string: textField.placeholderString ?? "",
+                attributes: [.foregroundColor: settingsTextMuted]
+            )
+        }
+
+        if let popup = control as? NSPopUpButton {
+            popup.contentTintColor = settingsTextPrimary
+        }
+    }
+
     static func makeSectionTitle(_ text: String) -> NSTextField {
         let label = NSTextField(labelWithString: text)
         label.font = .systemFont(ofSize: 13, weight: .semibold)
@@ -80,6 +127,20 @@ enum AppTheme {
         let label = NSTextField(wrappingLabelWithString: text)
         label.font = .systemFont(ofSize: 12, weight: .regular)
         label.textColor = textSecondary
+        return label
+    }
+
+    static func makeSettingsTitle(_ text: String) -> NSTextField {
+        let label = NSTextField(labelWithString: text)
+        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        label.textColor = settingsTextPrimary
+        return label
+    }
+
+    static func makeSettingsSecondaryText(_ text: String) -> NSTextField {
+        let label = NSTextField(wrappingLabelWithString: text)
+        label.font = .systemFont(ofSize: 12, weight: .regular)
+        label.textColor = settingsTextSecondary
         return label
     }
 

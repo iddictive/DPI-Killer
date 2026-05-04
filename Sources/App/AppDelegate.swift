@@ -22,6 +22,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupSignalHandlers()
+        TunnelManager.shared.onStatusChange = { [weak self] in
+            self?.refreshUI()
+        }
+        TunnelManager.shared.refresh()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         refreshUI()
 
@@ -46,11 +50,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        TunnelManager.shared.stop()
         DPIKillerManager.shared.fullCleanup()
     }
 
     func attemptStart() {
-        DPIKillerManager.shared.start { [weak self] success, error in
+        startSelectedMode { [weak self] success, error in
             self?.loadingWindow?.closeWithFade {
                 self?.loadingWindow = nil
                 self?.refreshUI()
@@ -112,10 +117,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func toggle() {
-        if DPIKillerManager.shared.isRunning {
+        if isModeRunning() {
+            TunnelManager.shared.stop()
             DPIKillerManager.shared.stop()
         } else {
-            DPIKillerManager.shared.start { [weak self] success, error in
+            startSelectedMode { [weak self] success, error in
                 if !success {
                     let alert = NSAlert()
                     alert.messageText = L10n.shared.failedToStart
@@ -277,11 +283,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let runtimeStatus = currentRuntimeStatus()
         let status = statusTitle(for: runtimeStatus)
         menu.addItem(NSMenuItem(title: status, action: nil, keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "\(L10n.shared.runtimeModeTitle) \(runtimeModeTitle())", action: nil, keyEquivalent: ""))
         if runtimeStatus != .stopped {
             menu.addItem(NSMenuItem(title: networkOptimizationTitle(for: runtimeStatus), action: nil, keyEquivalent: ""))
         }
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: DPIKillerManager.shared.isRunning ? L10n.shared.stop : L10n.shared.start, action: #selector(toggle), keyEquivalent: "t"))
+        menu.addItem(NSMenuItem(title: isModeRunning() ? L10n.shared.stop : L10n.shared.start, action: #selector(toggle), keyEquivalent: "t"))
         menu.addItem(NSMenuItem(title: L10n.shared.diagTitle, action: #selector(runDiagnostics), keyEquivalent: "d"))
         menu.addItem(NSMenuItem(title: L10n.shared.speedTest, action: #selector(showSpeedTest), keyEquivalent: "s"))
         menu.addItem(NSMenuItem(title: L10n.shared.logsTitle, action: #selector(showLogs), keyEquivalent: "l"))
@@ -309,8 +316,83 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func currentRuntimeStatus() -> RuntimeStatus {
+        if SettingsStore.shared.vpnModeEnabled {
+            if TunnelManager.shared.status == .connected, DPIKillerManager.shared.isRunning {
+                return .runningOptimized
+            }
+            if DPIKillerManager.shared.isRunning || TunnelManager.shared.isActive {
+                return .runningUnoptimized
+            }
+            return .stopped
+        }
+
         guard DPIKillerManager.shared.isRunning else { return .stopped }
         return isNetworkOptimizationApplied() ? .runningOptimized : .runningUnoptimized
+    }
+
+    func restartRuntime() {
+        TunnelManager.shared.stop()
+        DPIKillerManager.shared.stop()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.startSelectedMode { _, _ in
+                self?.refreshUI()
+            }
+        }
+    }
+
+    private func isModeRunning() -> Bool {
+        SettingsStore.shared.vpnModeEnabled ? TunnelManager.shared.isActive || DPIKillerManager.shared.isRunning : DPIKillerManager.shared.isRunning
+    }
+
+    private func startSelectedMode(completion: @escaping (Bool, String?) -> Void) {
+        if SettingsStore.shared.vpnModeEnabled {
+            if let issue = SystemExtensionManager.shared.availabilityIssue() {
+                AppLogger.log("[App] VPN mode is unavailable for this build. Disabling the toggle and starting in proxy mode.")
+                SettingsStore.shared.vpnModeEnabled = false
+                DPIKillerManager.shared.start { success, error in
+                    completion(success, error ?? issue)
+                }
+                return
+            }
+
+            SystemExtensionManager.shared.ensureActivated { activated, activationIssue, disableToggle in
+                if !activated {
+                    if disableToggle {
+                        SettingsStore.shared.vpnModeEnabled = false
+                    }
+                    AppLogger.log("[App] System extension is not active. Starting in proxy mode.")
+                    DPIKillerManager.shared.start { success, error in
+                        completion(success, error ?? activationIssue)
+                    }
+                    return
+                }
+
+                DPIKillerManager.shared.start { success, error in
+                    guard success else {
+                        completion(false, error)
+                        return
+                    }
+                    TunnelManager.shared.start { tunnelSuccess, tunnelError in
+                        if !tunnelSuccess {
+                            AppLogger.log("[App] VPN mode start failed. Falling back to system proxy mode.")
+                            DPIKillerManager.shared.stop()
+                            DPIKillerManager.shared.startProxyFallback { fallbackSuccess, fallbackError in
+                                if fallbackSuccess {
+                                    AppLogger.log("[App] Proxy fallback is active.")
+                                    completion(true, nil)
+                                } else {
+                                    completion(false, tunnelError ?? fallbackError)
+                                }
+                            }
+                            return
+                        }
+                        completion(true, nil)
+                    }
+                }
+            }
+        } else {
+            DPIKillerManager.shared.start(completion: completion)
+        }
     }
 
     private func statusTitle(for status: RuntimeStatus) -> String {
@@ -331,6 +413,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .stopped, .runningUnoptimized:
             return L10n.shared.networkOptimizationInactive
         }
+    }
+
+    private func runtimeModeTitle() -> String {
+        if !isModeRunning() {
+            return L10n.shared.runtimeModeOff
+        }
+        if SettingsStore.shared.vpnModeEnabled {
+            if TunnelManager.shared.status == .connected {
+                return L10n.shared.runtimeModeVpn
+            }
+            if DPIKillerManager.shared.isUsingProxyFallback {
+                return L10n.shared.runtimeModeProxyFallback
+            }
+        }
+        return L10n.shared.runtimeModeProxy
     }
 
     private func statusColor(for status: RuntimeStatus) -> NSColor {

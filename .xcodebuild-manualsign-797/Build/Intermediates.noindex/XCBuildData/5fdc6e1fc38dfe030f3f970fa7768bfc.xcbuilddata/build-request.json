@@ -1,0 +1,70 @@
+{
+  "buildCommand" : {
+    "command" : "build",
+    "skipDependencies" : false,
+    "style" : "buildOnly"
+  },
+  "configuredTargets" : [
+    {
+      "guid" : "9dc7d5c5f149b6fc0f2e6654857a281f32e34e3996d0b6e0551aa2248e3ba0af"
+    },
+    {
+      "guid" : "9dc7d5c5f149b6fc0f2e6654857a281f1cfe585b678146b2f14009332dcecae8"
+    }
+  ],
+  "containerPath" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/DPIKiller.xcodeproj",
+  "continueBuildingAfterErrors" : false,
+  "dependencyScope" : "workspace",
+  "enableIndexBuildArena" : false,
+  "hideShellScriptEnvironment" : false,
+  "parameters" : {
+    "action" : "build",
+    "activeArchitecture" : "arm64",
+    "activeRunDestination" : {
+      "disableOnlyActiveArch" : false,
+      "platform" : "macosx",
+      "sdk" : "macosx26.2",
+      "sdkVariant" : "macos",
+      "supportedArchitectures" : [
+        "arm64e",
+        "arm64",
+        "x86_64"
+      ],
+      "targetArchitecture" : "arm64"
+    },
+    "arenaInfo" : {
+      "buildIntermediatesPath" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign-797/Build/Intermediates.noindex",
+      "buildProductsPath" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign-797/Build/Products",
+      "derivedDataPath" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign-797",
+      "indexDataStoreFolderPath" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign-797/Index.noindex/DataStore",
+      "indexEnableDataStore" : true,
+      "indexPCHPath" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign-797/Index.noindex/PrecompiledHeaders",
+      "pchPath" : "/Users/md/Library/Mobile Documents/com~apple~CloudDocs/Documents/05_Repo/Spoof/.xcodebuild-manualsign-797/Build/Intermediates.noindex/PrecompiledHeaders"
+    },
+    "configurationName" : "Release",
+    "overrides" : {
+      "commandLine" : {
+        "table" : {
+          "CODE_SIGN_IDENTITY" : "Apple Development: Mikhail Drozdov (6T8PRW4LLW)",
+          "CODE_SIGN_STYLE" : "Manual",
+          "CODE_SIGNING_ALLOWED" : "YES",
+          "DEVELOPMENT_TEAM" : "797Z6Y2ACN",
+          "PROVISIONING_PROFILE_SPECIFIER" : ""
+        }
+      },
+      "synthesized" : {
+        "table" : {
+          "ACTION" : "build",
+          "ENABLE_PREVIEWS" : "NO",
+          "ENABLE_XOJIT_PREVIEWS" : "YES"
+        }
+      }
+    }
+  },
+  "schemeCommand" : "launch",
+  "showNonLoggedProgress" : true,
+  "useDryRun" : false,
+  "useImplicitDependencies" : true,
+  "useLegacyBuildLocations" : false,
+  "useParallelTargets" : true
+}
