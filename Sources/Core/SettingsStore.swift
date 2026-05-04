@@ -350,6 +350,9 @@ final class SettingsStore {
         switch engine {
         case .spoofdpi:
             var args: [String] = []
+            if spoofdpiSupportsHeadlessMode(binaryPath: explicitPath ?? binaryPath) {
+                args.append("--no-tui")
+            }
             if flags.contains("--silent") { args.append("--silent") }
             if flags.contains("--dns-ipv4-only") { args += ["--dns-qtype", "ipv4"] }
             if flags.contains("--debug") { args += ["--log-level", "debug"] }
@@ -437,6 +440,37 @@ final class SettingsStore {
     }
 
     private var optionsFlags: Set<String> {
-        ["--system-proxy", "--silent", "--dns-ipv4-only", "--debug", "--policy-auto"]
+        ["--system-proxy", "--silent", "--dns-ipv4-only", "--debug", "--policy-auto", "--no-tui"]
+    }
+
+    private func spoofdpiSupportsHeadlessMode(binaryPath: String) -> Bool {
+        guard FileManager.default.isExecutableFile(atPath: binaryPath) else { return false }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: binaryPath)
+        process.arguments = ["--version"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard let output = String(data: data, encoding: .utf8) else { return false }
+            let pattern = #"spoofdpi\s+(\d+)\.(\d+)\.(\d+)"#
+            guard let regex = try? NSRegularExpression(pattern: pattern),
+                  let match = regex.firstMatch(in: output, range: NSRange(output.startIndex..., in: output)),
+                  let majorRange = Range(match.range(at: 1), in: output),
+                  let minorRange = Range(match.range(at: 2), in: output),
+                  let major = Int(output[majorRange]),
+                  let minor = Int(output[minorRange]) else {
+                return false
+            }
+            return major > 1 || (major == 1 && minor >= 4)
+        } catch {
+            return false
+        }
     }
 }
