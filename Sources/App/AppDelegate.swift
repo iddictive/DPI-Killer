@@ -58,17 +58,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     if error == "NOT_INSTALLED" {
                         self?.showInstallAlert()
                     } else {
-                        let alert = NSAlert()
-                        alert.messageText = L10n.shared.failedToStart
-                        alert.informativeText = error ?? (L10n.shared.isRussian ? "Проверьте настройки." : "Check settings.")
-                        NSApp.activate(ignoringOtherApps: true)
-                        alert.beginSheetModal(for: self?.settingsWindow?.window ?? NSWindow()) { _ in
-                            self?.showSettings()
-                        }
+                        self?.showStartupFailureAlert(error: error)
                     }
                 }
             }
         }
+    }
+
+    private func showStartupFailureAlert(error: String?) {
+        let alert = NSAlert()
+        alert.messageText = L10n.shared.failedToStart
+        alert.informativeText = error ?? (L10n.shared.isRussian ? "Проверьте настройки." : "Check settings.")
+
+        NSApp.activate(ignoringOtherApps: true)
+        if settingsWindow == nil {
+            settingsWindow = SettingsWindowController()
+        }
+        showSettings()
+
+        guard let window = settingsWindow?.window else {
+            alert.runModal()
+            return
+        }
+        alert.beginSheetModal(for: window)
     }
 
     func refreshUI() {

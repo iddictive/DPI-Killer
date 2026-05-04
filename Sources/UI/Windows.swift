@@ -1233,7 +1233,11 @@ final class LoadingWindowController: NSWindowController {
         NSAnimationContext.runAnimationGroup({
             $0.duration = 0.18
             window?.animator().alphaValue = 0
-        }, completionHandler: completion)
+        }, completionHandler: { [weak self] in
+            self?.window?.orderOut(nil)
+            self?.window?.alphaValue = 1
+            completion()
+        })
     }
 }
 
