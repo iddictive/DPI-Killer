@@ -53,8 +53,7 @@ final class TunnelManager {
             return
         }
 
-        let rawPort = Int(SettingsStore.shared.localPort.trimmingCharacters(in: .whitespaces)) ?? 8080
-        let port = max(1, min(65535, rawPort))
+        let port = DPIKillerManager.shared.proxyPort
         let engine = SettingsStore.shared.resolvedEngine
         let proxyMode: TunnelProxyMode = switch engine.proxyMode {
         case .http: .http

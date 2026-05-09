@@ -534,11 +534,11 @@ final class SettingsStore {
         return manualParts.joined(separator: " ")
     }
 
-    func launchArguments(for explicitPath: String? = nil) -> [String] {
+    func launchArguments(for explicitPath: String? = nil, port portOverride: Int? = nil) -> [String] {
         let engine = currentEngine(for: explicitPath)
         let manualParts = argumentParts(from: manualArgsString(for: explicitPath))
         let flags = selectedFlags(for: engine)
-        let port = (Int(localPort.trimmingCharacters(in: .whitespaces)) ?? 8080).clamped(to: 1...65535)
+        let port = (portOverride ?? (Int(localPort.trimmingCharacters(in: .whitespaces)) ?? 8080)).clamped(to: 1...65535)
         let ttlValue = (Int(defaultTTL.trimmingCharacters(in: .whitespaces)) ?? 128).clamped(to: 1...255)
         let fakeCount = (Int(httpsFakeCount.trimmingCharacters(in: .whitespaces)) ?? 0).clamped(to: 0...100)
         let chunkSize = (Int(httpsChunkSize.trimmingCharacters(in: .whitespaces)) ?? 20).clamped(to: 1...1000)

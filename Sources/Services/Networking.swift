@@ -138,8 +138,7 @@ final class SpeedTestManager: NSObject, URLSessionDownloadDelegate, URLSessionTa
         let url = URL(string: "https://speed.cloudflare.com/__down?bytes=50000000")!
         let config = URLSessionConfiguration.ephemeral
         if DPIKillerManager.shared.isRunning {
-            let port = Int(SettingsStore.shared.localPort) ?? 8080
-            config.connectionProxyDictionary = SettingsStore.shared.resolvedEngine.sessionProxyDictionary(port: port)
+            config.connectionProxyDictionary = SettingsStore.shared.resolvedEngine.sessionProxyDictionary(port: DPIKillerManager.shared.proxyPort)
         }
         session = URLSession(configuration: config, delegate: self, delegateQueue: delegateQueue)
         startTime = Date()
@@ -156,8 +155,7 @@ final class SpeedTestManager: NSObject, URLSessionDownloadDelegate, URLSessionTa
 
         let config = URLSessionConfiguration.ephemeral
         if DPIKillerManager.shared.isRunning {
-            let port = Int(SettingsStore.shared.localPort) ?? 8080
-            config.connectionProxyDictionary = SettingsStore.shared.resolvedEngine.sessionProxyDictionary(port: port)
+            config.connectionProxyDictionary = SettingsStore.shared.resolvedEngine.sessionProxyDictionary(port: DPIKillerManager.shared.proxyPort)
         }
 
         uploadSession?.invalidateAndCancel()
@@ -233,9 +231,8 @@ final class DiagnosticsManager: NSObject {
 
         let url = URL(string: "https://www.google.com")!
         let config = URLSessionConfiguration.ephemeral
-        let port = Int(SettingsStore.shared.localPort) ?? 8080
 
-        config.connectionProxyDictionary = SettingsStore.shared.resolvedEngine.sessionProxyDictionary(port: port)
+        config.connectionProxyDictionary = SettingsStore.shared.resolvedEngine.sessionProxyDictionary(port: DPIKillerManager.shared.proxyPort)
         config.timeoutIntervalForRequest = 5.0
 
         let session = URLSession(configuration: config)

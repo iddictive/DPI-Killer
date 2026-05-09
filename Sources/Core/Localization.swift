@@ -98,6 +98,7 @@ struct L10n {
     func localPortInUse(_ port: Int) -> String {
         isRussian ? "Локальный порт \(port) уже занят другим процессом." : "Local port \(port) is already in use by another process."
     }
+    var noAvailableLocalPort: String { isRussian ? "Нет свободного локального порта для proxy." : "No free local proxy port is available." }
     var failedToStart: String { isRussian ? "DPI Killer не запустился" : "DPI Killer could not start" }
     var startupFailureInfo: String { isRussian ? "Откройте настройки и проверьте backend и параметры сети." : "Open Settings and review the backend and network options." }
     var preparingBypass: String { isRussian ? "Подготовка обхода..." : "Preparing bypass..." }

@@ -892,6 +892,8 @@ final class SettingsViewModel: ObservableObject {
     @Published private var vpnAvailabilityIssue: String?
     @Published private var tunnelActive: Bool
     @Published private var networkOptimizationApplied = false
+    @Published private var backendRunning = false
+    @Published private var runtimePort: Int?
 
     let backendSelections: [BackendSelection] = [.automatic, .ciadpi, .spoofdpi, .custom]
     let splitModes = ["sni", "random", "chunk", "none"]
@@ -950,6 +952,8 @@ final class SettingsViewModel: ObservableObject {
         vpnAvailabilityIssue = systemExtensionManager.availabilityIssue()
         tunnelActive = tunnelManager.isActive
         networkOptimizationApplied = store.isNetworkOptimizationApplied()
+        backendRunning = DPIKillerManager.shared.isRunning
+        runtimePort = DPIKillerManager.shared.activePort
 
         refreshCiadpiLocalStatus()
         refreshSpoofdpiLocalStatus()
@@ -998,10 +1002,11 @@ final class SettingsViewModel: ObservableObject {
     }
 
     var runtimeStatusTitle: String {
+        let portSuffix = backendRunning ? " • Port \(runtimePort ?? DPIKillerManager.shared.proxyPort)" : ""
         if vpnModeEnabled {
-            return tunnelActive ? L10n.shared.runtimeModeVpn : L10n.shared.vpnStatusReady
+            return (tunnelActive ? L10n.shared.runtimeModeVpn : L10n.shared.vpnStatusReady) + portSuffix
         }
-        return L10n.shared.runtimeModeProxy
+        return L10n.shared.runtimeModeProxy + portSuffix
     }
 
     var runtimeBadgeStyle: SettingsBadgeStyle {
@@ -1211,6 +1216,8 @@ final class SettingsViewModel: ObservableObject {
         vpnAvailabilityIssue = SystemExtensionManager.shared.availabilityIssue()
         tunnelActive = TunnelManager.shared.isActive
         networkOptimizationApplied = store.isNetworkOptimizationApplied()
+        backendRunning = DPIKillerManager.shared.isRunning
+        runtimePort = DPIKillerManager.shared.activePort
         if !vpnAvailable, vpnModeEnabled {
             vpnModeEnabled = false
         }

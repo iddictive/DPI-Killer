@@ -23,6 +23,7 @@ final class DPIKillerManager {
     private var wasRunningBeforeDisconnect = false
     private var shouldRestoreAfterDisconnect = false
     private var isConnectivityRestartInProgress = false
+    private(set) var activePort: Int?
 
     private var currentEngine: BypassEngine {
         SettingsStore.shared.currentEngine()
@@ -30,6 +31,10 @@ final class DPIKillerManager {
 
     var isUsingProxyFallback: Bool {
         forceSystemProxyOverride && isRunning
+    }
+
+    var proxyPort: Int {
+        activePort ?? preferredLocalPort()
     }
 
     init() {
@@ -85,7 +90,7 @@ final class DPIKillerManager {
 
         let binaryPath = SettingsStore.shared.binaryPath
         let engine = SettingsStore.shared.currentEngine(for: binaryPath)
-        let port = (Int(SettingsStore.shared.localPort.trimmingCharacters(in: .whitespaces)) ?? 8080).clamped(to: 1...65535)
+        let preferredPort = preferredLocalPort()
         AppLogger.log("[Manager] Starting with binary: \(binaryPath)")
         guard FileManager.default.fileExists(atPath: binaryPath) else {
             completion(false, "NOT_INSTALLED")
@@ -94,14 +99,17 @@ final class DPIKillerManager {
         if SettingsStore.shared.disableIpv6 {
             SettingsStore.shared.applyIpv6Preference()
         }
-        guard isLocalPortAvailable(port: port) else {
-            completion(false, L10n.shared.localPortInUse(port))
+        guard let port = availableLocalPort(preferredPort: preferredPort) else {
+            completion(false, L10n.shared.noAvailableLocalPort)
             return
+        }
+        if port != preferredPort {
+            AppLogger.log("[Manager] Preferred port \(preferredPort) is busy. Using \(port).")
         }
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: binaryPath)
-        process.arguments = SettingsStore.shared.launchArguments(for: binaryPath)
+        process.arguments = SettingsStore.shared.launchArguments(for: binaryPath, port: port)
 
         let pipe = Pipe()
         outputPipe = pipe
@@ -131,6 +139,7 @@ final class DPIKillerManager {
                 self.outputPipe = nil
                 self.isRunning = false
                 self.process = nil
+                self.activePort = nil
                 self.stopWatchdog()
                 (NSApp.delegate as? AppDelegate)?.refreshUI()
             }
@@ -162,8 +171,9 @@ final class DPIKillerManager {
                     }
 
                     self.isRunning = true
+                    self.activePort = port
                     if forceSystemProxy || (SettingsStore.shared.usesSystemProxy && !SettingsStore.shared.vpnModeEnabled) {
-                        self.enableSystemProxy(for: engine)
+                        self.enableSystemProxy(for: engine, port: port)
                     }
                     self.startWatchdog()
                     completion(true, nil)
@@ -213,6 +223,7 @@ final class DPIKillerManager {
         wasRunningBeforeDisconnect = false
         shouldRestoreAfterDisconnect = false
         isConnectivityRestartInProgress = false
+        activePort = nil
         stopWatchdog()
         outputPipe?.fileHandleForReading.readabilityHandler = nil
         outputPipe = nil
@@ -364,8 +375,7 @@ final class DPIKillerManager {
         }
     }
 
-    private func enableSystemProxy(for engine: BypassEngine) {
-        let port = (Int(SettingsStore.shared.localPort.trimmingCharacters(in: .whitespaces)) ?? 8080).clamped(to: 1...65535)
+    private func enableSystemProxy(for engine: BypassEngine, port: Int) {
         let script: String
         switch engine.proxyMode {
         case .http:
@@ -525,6 +535,29 @@ final class DPIKillerManager {
         _ = semaphore.wait(timeout: .now() + 1.0)
         connection.cancel()
         return reachable
+    }
+
+    private func preferredLocalPort() -> Int {
+        (Int(SettingsStore.shared.localPort.trimmingCharacters(in: .whitespaces)) ?? 8080).clamped(to: 1...65535)
+    }
+
+    private func availableLocalPort(preferredPort: Int) -> Int? {
+        if isLocalPortAvailable(port: preferredPort) {
+            return preferredPort
+        }
+
+        let upperPreferredRange = min(65535, preferredPort + 200)
+        if preferredPort < upperPreferredRange {
+            for port in (preferredPort + 1)...upperPreferredRange where isLocalPortAvailable(port: port) {
+                return port
+            }
+        }
+
+        for port in 49152...65535 where isLocalPortAvailable(port: port) {
+            return port
+        }
+
+        return nil
     }
 
     private func isLocalPortAvailable(port: Int) -> Bool {
