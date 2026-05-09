@@ -14,6 +14,8 @@ struct L10n {
     var statusStopped: String { isRussian ? "Статус: остановлено" : "Status: Stopped" }
     var networkOptimizationActive: String { isRussian ? "Сеть: оптимизирована" : "Network: Optimized" }
     var networkOptimizationInactive: String { isRussian ? "Сеть: нужна оптимизация" : "Network: Needs optimization" }
+    var networkOptimizationApply: String { isRussian ? "Оптимизировать сеть..." : "Optimize Network..." }
+    var networkOptimizationApplying: String { isRussian ? "Оптимизация сети..." : "Optimizing network..." }
     var menuRuntimeSection: String { isRussian ? "Состояние" : "Runtime" }
     var menuToolsSection: String { isRussian ? "Инструменты" : "Tools" }
     var menuUpdateSection: String { isRussian ? "Обслуживание" : "Maintenance" }
@@ -66,6 +68,7 @@ struct L10n {
     var fixHotspotButton: String { isRussian ? "Снять ограничения (Sudo)" : "Remove Limits (Sudo)" }
     var fixHotspotSuccess: String { isRussian ? "Настройки TTL применены" : "TTL settings applied" }
     var fixHotspotFailed: String { isRussian ? "Не удалось применить настройки." : "Failed to apply settings." }
+    var refreshStatus: String { isRussian ? "Обновить статус" : "Refresh Status" }
 
     var dnsTitle: String { isRussian ? "Настройки DNS:" : "DNS Settings:" }
     var dnsAddrTitle: String { isRussian ? "DNS Адрес:" : "DNS Address:" }

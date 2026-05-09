@@ -208,6 +208,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         GitHubUpdater.shared.checkForUpdates(manual: true)
     }
 
+    @objc func applyNetworkOptimization() {
+        SettingsStore.shared.applyMobileHotspotPreset()
+        SettingsStore.shared.applyNetworkOptimization { [weak self] success, error in
+            guard let self else { return }
+            if success {
+                if self.isModeRunning() {
+                    self.restartRuntime()
+                }
+                self.refreshUI()
+                return
+            }
+
+            self.refreshUI()
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = L10n.shared.fixHotspotFailed
+            alert.informativeText = error ?? L10n.shared.startupFailureInfo
+            self.presentAlert(alert)
+        }
+    }
+
     private func showInstallAlert() {
         let alert = NSAlert()
         alert.alertStyle = .warning
@@ -294,8 +315,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(disabledMenuItem(title: statusTitle(for: runtimeStatus)))
         menu.addItem(disabledMenuItem(title: "\(L10n.shared.runtimeModeTitle) \(runtimeModeTitle())"))
         menu.addItem(disabledMenuItem(title: "\(L10n.shared.backendRuntimeTitle) \(backendRuntimeTitle())"))
-        if runtimeStatus != .stopped {
-            menu.addItem(disabledMenuItem(title: networkOptimizationTitle(for: runtimeStatus)))
+        if SettingsStore.shared.isNetworkOptimizationApplied() {
+            menu.addItem(disabledMenuItem(title: L10n.shared.networkOptimizationActive))
+        } else {
+            menu.addItem(actionMenuItem(title: L10n.shared.networkOptimizationApply, action: #selector(applyNetworkOptimization), key: ""))
         }
 
         menu.addItem(NSMenuItem.separator())
@@ -378,7 +401,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         guard DPIKillerManager.shared.isRunning else { return .stopped }
-        return isNetworkOptimizationApplied() ? .runningOptimized : .runningUnoptimized
+        return SettingsStore.shared.isNetworkOptimizationApplied() ? .runningOptimized : .runningUnoptimized
     }
 
     func restartRuntime() {
@@ -457,15 +480,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func networkOptimizationTitle(for status: RuntimeStatus) -> String {
-        switch status {
-        case .runningOptimized:
-            return L10n.shared.networkOptimizationActive
-        case .stopped, .runningUnoptimized:
-            return L10n.shared.networkOptimizationInactive
-        }
-    }
-
     private func runtimeModeTitle() -> String {
         if !isModeRunning() {
             return L10n.shared.runtimeModeOff
@@ -537,23 +551,4 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func isNetworkOptimizationApplied() -> Bool {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/sbin/sysctl")
-        task.arguments = ["-n", "net.inet.ip.ttl"]
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = FileHandle.nullDevice
-
-        do {
-            try task.run()
-            task.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            return Int(output ?? "") == 65
-        } catch {
-            return false
-        }
-    }
 }

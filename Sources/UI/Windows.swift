@@ -605,6 +605,7 @@ final class LoadingWindowController: NSWindowController {
         window.center()
         window.isMovableByWindowBackground = true
         window.level = .floating
+        window.appearance = NSAppearance(named: .darkAqua)
         window.backgroundColor = .clear
         window.isOpaque = false
         window.hasShadow = true
@@ -621,7 +622,7 @@ final class LoadingWindowController: NSWindowController {
         contentStack.spacing = 12
         contentStack.alignment = .centerX
         background.addSubview(contentStack)
-        contentStack.fill(parent: background, padding: 24)
+        contentStack.translatesAutoresizingMaskIntoConstraints = false
 
         let iconContainer = NSView()
         iconContainer.translatesAutoresizingMaskIntoConstraints = false
@@ -680,6 +681,10 @@ final class LoadingWindowController: NSWindowController {
         }
 
         NSLayoutConstraint.activate([
+            contentStack.centerXAnchor.constraint(equalTo: background.centerXAnchor),
+            contentStack.centerYAnchor.constraint(equalTo: background.centerYAnchor),
+            contentStack.leadingAnchor.constraint(greaterThanOrEqualTo: background.leadingAnchor, constant: 24),
+            contentStack.trailingAnchor.constraint(lessThanOrEqualTo: background.trailingAnchor, constant: -24),
             subtitle.widthAnchor.constraint(equalTo: contentStack.widthAnchor)
         ])
     }
@@ -754,6 +759,8 @@ final class LoaderBackgroundView: NSView {
 final class LoaderProgressView: NSView {
     private let trackLayer = CALayer()
     private let fillLayer = CAGradientLayer()
+    private var isIndeterminate = false
+    private var progressValue: Double = 0
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -786,31 +793,54 @@ final class LoaderProgressView: NSView {
         trackLayer.frame = bounds
         trackLayer.cornerRadius = radius
         fillLayer.cornerRadius = radius
-        if fillLayer.animation(forKey: "loaderSlide") == nil {
-            fillLayer.frame = bounds.insetBy(dx: bounds.width * 0.34, dy: 0)
+
+        if isIndeterminate {
+            startIndeterminateAnimationIfNeeded()
+        } else {
+            applyProgressFrame(progressValue)
         }
     }
 
     func setProgress(_ value: Double) {
+        isIndeterminate = false
         fillLayer.removeAnimation(forKey: "loaderSlide")
-        let clamped = max(0, min(1, value))
-        let width = max(bounds.width * CGFloat(clamped), bounds.height)
-        fillLayer.frame = NSRect(x: 0, y: 0, width: width, height: bounds.height)
+        progressValue = max(0, min(1, value))
+        applyProgressFrame(progressValue)
     }
 
     func setIndeterminate(_ isIndeterminate: Bool) {
+        self.isIndeterminate = isIndeterminate
         if isIndeterminate {
-            let segmentWidth = max(bounds.width * 0.34, bounds.height * 2.4)
-            fillLayer.frame = NSRect(x: -segmentWidth, y: 0, width: segmentWidth, height: bounds.height)
-            let animation = CABasicAnimation(keyPath: "position.x")
-            animation.fromValue = -segmentWidth / 2
-            animation.toValue = bounds.width + segmentWidth / 2
-            animation.duration = 0.9
-            animation.repeatCount = .infinity
-            animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            fillLayer.add(animation, forKey: "loaderSlide")
+            startIndeterminateAnimationIfNeeded()
         } else {
             fillLayer.removeAnimation(forKey: "loaderSlide")
+            applyProgressFrame(progressValue)
         }
+    }
+
+    private func applyProgressFrame(_ value: Double) {
+        guard bounds.width > 0, bounds.height > 0 else {
+            needsLayout = true
+            return
+        }
+        let width = max(bounds.width * CGFloat(value), bounds.height)
+        fillLayer.frame = NSRect(x: 0, y: 0, width: width, height: bounds.height)
+    }
+
+    private func startIndeterminateAnimationIfNeeded() {
+        guard bounds.width > 0, bounds.height > 0 else {
+            needsLayout = true
+            return
+        }
+        guard fillLayer.animation(forKey: "loaderSlide") == nil else { return }
+        let segmentWidth = max(bounds.width * 0.34, bounds.height * 2.4)
+        fillLayer.frame = NSRect(x: -segmentWidth, y: 0, width: segmentWidth, height: bounds.height)
+        let animation = CABasicAnimation(keyPath: "position.x")
+        animation.fromValue = -segmentWidth / 2
+        animation.toValue = bounds.width + segmentWidth / 2
+        animation.duration = 0.9
+        animation.repeatCount = .infinity
+        animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        fillLayer.add(animation, forKey: "loaderSlide")
     }
 }

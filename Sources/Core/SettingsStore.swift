@@ -306,6 +306,51 @@ final class SettingsStore {
         applyIpv6Settings(disableIpv6)
     }
 
+    func applyMobileHotspotPreset() {
+        defaultTTL = "65"
+        splitMode = "random"
+        httpsDisorder = true
+        httpsFakeCount = resolvedEngine == .ciadpi ? "1" : "0"
+        httpsChunkSize = "20"
+    }
+
+    func isNetworkOptimizationApplied() -> Bool {
+        sysctlIntValue("net.inet.ip.ttl") == 65
+    }
+
+    func applyNetworkOptimization(completion: @escaping (Bool, String?) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            process.arguments = [
+                "-e",
+                #"do shell script "/usr/sbin/sysctl -w net.inet.ip.ttl=65" with administrator privileges"#
+            ]
+
+            let outputPipe = Pipe()
+            let errorPipe = Pipe()
+            process.standardOutput = outputPipe
+            process.standardError = errorPipe
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+                let output = String(data: outputPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let error = String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let success = process.terminationStatus == 0 && self.isNetworkOptimizationApplied()
+                DispatchQueue.main.async {
+                    completion(success, success ? output : (error?.isEmpty == false ? error : nil))
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completion(false, error.localizedDescription)
+                }
+            }
+        }
+    }
+
     func restoreIpv6Defaults() {
         applyIpv6Settings(false)
     }
@@ -669,6 +714,26 @@ final class SettingsStore {
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
         process.arguments = ["-c", script]
         try? process.run()
+    }
+
+    private func sysctlIntValue(_ name: String) -> Int? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/sysctl")
+        process.arguments = ["-n", name]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let output = String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return Int(output ?? "")
+        } catch {
+            return nil
+        }
     }
 
     private func toggleLaunchAtLogin(_ enabled: Bool) {

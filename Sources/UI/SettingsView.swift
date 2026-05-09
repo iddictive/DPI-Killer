@@ -414,16 +414,28 @@ struct SettingsView: View {
                 }
             }
 
+            SettingsRow(L10n.shared.hotspotStatusTitle) {
+                HStack(spacing: 8) {
+                    SettingsBadge(title: viewModel.networkOptimizationStatusTitle, style: viewModel.networkOptimizationBadgeStyle)
+                    if viewModel.isApplyingNetworkOptimization {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
+            }
+
             HStack(spacing: 10) {
                 Button(L10n.shared.mobilePresetTitle) {
                     viewModel.applyMobilePreset()
                 }
                 .buttonStyle(.bordered)
+                .disabled(viewModel.isApplyingNetworkOptimization)
 
-                Button(text(ru: "Обновить статус", en: "Refresh Status")) {
+                Button(L10n.shared.refreshStatus) {
                     viewModel.refreshRuntimeStatus()
                 }
                 .buttonStyle(.bordered)
+                .disabled(viewModel.isApplyingNetworkOptimization)
             }
             .padding(.leading, DPISettingsTokens.rowLabelWidth + 12)
         }
@@ -872,12 +884,14 @@ final class SettingsViewModel: ObservableObject {
     @Published var isCheckingCiadpi = false
     @Published var isUpdatingCiadpi = false
     @Published var isActivatingSystemExtension = false
+    @Published var isApplyingNetworkOptimization = false
 
     @Published private var flagsByEngine: [BypassEngine: Set<String>]
     @Published private var spoofdpiStatus: SpoofdpiUpdateStatus?
     @Published private var ciadpiStatus: CiadpiUpdateStatus?
     @Published private var vpnAvailabilityIssue: String?
     @Published private var tunnelActive: Bool
+    @Published private var networkOptimizationApplied = false
 
     let backendSelections: [BackendSelection] = [.automatic, .ciadpi, .spoofdpi, .custom]
     let splitModes = ["sni", "random", "chunk", "none"]
@@ -935,6 +949,7 @@ final class SettingsViewModel: ObservableObject {
             : (L10n.shared.isRussian ? "Managed ciadpi не установлен." : "Managed ciadpi is not installed.")
         vpnAvailabilityIssue = systemExtensionManager.availabilityIssue()
         tunnelActive = tunnelManager.isActive
+        networkOptimizationApplied = store.isNetworkOptimizationApplied()
 
         refreshCiadpiLocalStatus()
         refreshSpoofdpiLocalStatus()
@@ -991,6 +1006,14 @@ final class SettingsViewModel: ObservableObject {
 
     var runtimeBadgeStyle: SettingsBadgeStyle {
         vpnModeEnabled && !vpnAvailable ? .warning : .neutral
+    }
+
+    var networkOptimizationStatusTitle: String {
+        networkOptimizationApplied ? L10n.shared.networkOptimizationActive : L10n.shared.networkOptimizationInactive
+    }
+
+    var networkOptimizationBadgeStyle: SettingsBadgeStyle {
+        networkOptimizationApplied ? .success : .warning
     }
 
     var vpnStatusTitle: String {
@@ -1156,6 +1179,8 @@ final class SettingsViewModel: ObservableObject {
     func applyMobilePreset() {
         selectedPreset = .hotspot
         applyPreset(.hotspot)
+        save()
+        applyNetworkOptimization()
     }
 
     func applyPreset(_ preset: SettingsPreset) {
@@ -1185,8 +1210,31 @@ final class SettingsViewModel: ObservableObject {
     func refreshRuntimeStatus() {
         vpnAvailabilityIssue = SystemExtensionManager.shared.availabilityIssue()
         tunnelActive = TunnelManager.shared.isActive
+        networkOptimizationApplied = store.isNetworkOptimizationApplied()
         if !vpnAvailable, vpnModeEnabled {
             vpnModeEnabled = false
+        }
+    }
+
+    func applyNetworkOptimization() {
+        guard !isApplyingNetworkOptimization else { return }
+        isApplyingNetworkOptimization = true
+        footerStatus = L10n.shared.networkOptimizationApplying
+        store.applyNetworkOptimization { [weak self] success, error in
+            guard let self else { return }
+            self.isApplyingNetworkOptimization = false
+            self.networkOptimizationApplied = self.store.isNetworkOptimizationApplied()
+            if success {
+                self.footerStatus = L10n.shared.fixHotspotSuccess
+                if DPIKillerManager.shared.isRunning {
+                    (NSApp.delegate as? AppDelegate)?.restartRuntime()
+                } else {
+                    (NSApp.delegate as? AppDelegate)?.refreshUI()
+                }
+            } else {
+                self.footerStatus = error?.isEmpty == false ? error : L10n.shared.fixHotspotFailed
+                (NSApp.delegate as? AppDelegate)?.refreshUI()
+            }
         }
     }
 

@@ -477,7 +477,7 @@ final class DPIKillerManager {
         engine: BypassEngine,
         process: Process,
         port: Int,
-        timeout: TimeInterval = 6.0,
+        timeout: TimeInterval = 18.0,
         completion: @escaping (Bool) -> Void
     ) {
         DispatchQueue.global(qos: .utility).async {
