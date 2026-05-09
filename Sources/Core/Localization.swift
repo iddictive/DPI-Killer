@@ -95,6 +95,9 @@ struct L10n {
     var installManual: String { isRussian ? "Неизвестная ошибка. Установите ciadpi вручную и скачайте SpoofDPI из официального GitHub release." : "Unknown error. Please install ciadpi manually and download SpoofDPI from the official GitHub release." }
     var backendStartTimeout: String { isRussian ? "Backend не запустил локальный proxy вовремя." : "The backend did not start the local proxy in time." }
     var backendExitedEarly: String { isRussian ? "Backend остановился до готовности." : "The backend stopped before it was ready." }
+    func localPortInUse(_ port: Int) -> String {
+        isRussian ? "Локальный порт \(port) уже занят другим процессом." : "Local port \(port) is already in use by another process."
+    }
     var failedToStart: String { isRussian ? "DPI Killer не запустился" : "DPI Killer could not start" }
     var startupFailureInfo: String { isRussian ? "Откройте настройки и проверьте backend и параметры сети." : "Open Settings and review the backend and network options." }
     var preparingBypass: String { isRussian ? "Подготовка обхода..." : "Preparing bypass..." }

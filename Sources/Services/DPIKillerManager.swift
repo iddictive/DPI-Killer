@@ -94,6 +94,10 @@ final class DPIKillerManager {
         if SettingsStore.shared.disableIpv6 {
             SettingsStore.shared.applyIpv6Preference()
         }
+        guard isLocalPortAvailable(port: port) else {
+            completion(false, L10n.shared.localPortInUse(port))
+            return
+        }
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: binaryPath)
@@ -521,5 +525,34 @@ final class DPIKillerManager {
         _ = semaphore.wait(timeout: .now() + 1.0)
         connection.cancel()
         return reachable
+    }
+
+    private func isLocalPortAvailable(port: Int) -> Bool {
+        guard let endpointPort = NWEndpoint.Port(rawValue: UInt16(port)) else { return false }
+        let semaphore = DispatchSemaphore(value: 0)
+        let queue = DispatchQueue(label: "com.iddictive.dpikiller.port-check")
+        var available = false
+
+        do {
+            let listener = try NWListener(using: .tcp, on: endpointPort)
+            listener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    available = true
+                    semaphore.signal()
+                case .failed(_), .cancelled:
+                    semaphore.signal()
+                default:
+                    break
+                }
+            }
+            listener.start(queue: queue)
+            _ = semaphore.wait(timeout: .now() + 1.0)
+            listener.cancel()
+        } catch {
+            return false
+        }
+
+        return available
     }
 }
