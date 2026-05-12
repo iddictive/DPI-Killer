@@ -1,0 +1,571 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1024AFCCD06A3D1BC1561EF2 /* SystemExtensions.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2A9DEF37C2A75BEDA797F2DE /* SystemExtensions.framework */; };
+		1D65BAE6100E2C5C3862A284 /* TunnelConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = D05FC073386ED1D2698E63B8 /* TunnelConfiguration.swift */; };
+		2A6990A0D1AA571CF888DB8A /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0FD15DD50A898A04599D417B /* WebKit.framework */; };
+		2F18706A7B64A3D079E1A95A /* DPIKillerTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 51A02D1E1E8A368D680C1F25 /* DPIKillerTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		3BA436F4E372488985B5DF4B /* SystemExtensionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86128C7EAB89828D47ECAA48 /* SystemExtensionManager.swift */; };
+		452B79234C7B3F5438B1329C /* BypassEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05B48A01CCA543395AB0D349 /* BypassEngine.swift */; };
+		4A581EF68B4CC3830A24F9EF /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C78AA55966132425DC378C83 /* NetworkExtension.framework */; };
+		4B33B3313F97E4B56D02EE75 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 899BE7B7C478CF9CD958201E /* Network.framework */; };
+		6515533DE5832A818C028713 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21CBCB2639DD18798DEE7905 /* Localization.swift */; };
+		6F5FF1E200484DC5EED50A88 /* GitHubUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B661BA4B3DC334E01E177B /* GitHubUpdater.swift */; };
+		702F910E54DDC32E88E36ADA /* TunnelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 992ACF5ED1140C1505EC2FE6 /* TunnelManager.swift */; };
+		716F8D4F0F5D5E3EA458C244 /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57730A23414F81DE2373966A /* Logging.swift */; };
+		733743CB4C4CA16D79FE3EF8 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A8B91A4000F10943366F3399 /* Foundation.framework */; };
+		7CF9CA9EFC4B8913E4B370F7 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C78AA55966132425DC378C83 /* NetworkExtension.framework */; };
+		82B69430FE777F74AA8A4832 /* TunnelConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = D05FC073386ED1D2698E63B8 /* TunnelConfiguration.swift */; };
+		8FB06D66C2C729BC8543FE02 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 527B0CC4FBB730B4A008A88C /* AppKit.framework */; };
+		91BC71FDF88B0E8C85BFAF3B /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EB84FBE986F62694C009D2E /* AppTheme.swift */; };
+		A6CA6E66D1E103C5A31412E4 /* Networking.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACC96E1C1E57911FDF9242E3 /* Networking.swift */; };
+		B2EFA72DCB0DA68D1B6EECEA /* Windows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21F4A1046FB1F2E2057C3012 /* Windows.swift */; };
+		BDB7180807F41A0F3C0A0854 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6040315AA8DFDDF17943DEC /* AppDelegate.swift */; };
+		D5700B9F8E56D8B4FEE1D27A /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C9C842FBEFFDB2BA10C1593 /* main.swift */; };
+		DB1FEC94A3EAA9FDDB67B369 /* DPIKillerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAE315BCFD45F1C64570AC83 /* DPIKillerManager.swift */; };
+		DDE32201B66B2D488ADDF37F /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEEB59BD3FF5DE0D39237CE /* PacketTunnelProvider.swift */; };
+		F4D8946BC3D20CC93265CD5E /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99E07F376C6DF5B21113629F /* SettingsStore.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		2BC4C6F158B4E9881CC4B672 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FC0AC62F7C85429F88D47030 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 94FC2B5816687862C8B3E459;
+			remoteInfo = DPIKillerTunnel;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		35FEE4E1DB7B55042CF9ADAF /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				2F18706A7B64A3D079E1A95A /* DPIKillerTunnel.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		05B48A01CCA543395AB0D349 /* BypassEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BypassEngine.swift; sourceTree = "<group>"; };
+		0FD15DD50A898A04599D417B /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		21CBCB2639DD18798DEE7905 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
+		21F4A1046FB1F2E2057C3012 /* Windows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Windows.swift; sourceTree = "<group>"; };
+		22828730B51AD1422458BDD1 /* DPIKiller.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DPIKiller.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2A9DEF37C2A75BEDA797F2DE /* SystemExtensions.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SystemExtensions.framework; path = System/Library/Frameworks/SystemExtensions.framework; sourceTree = SDKROOT; };
+		2EB84FBE986F62694C009D2E /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
+		4C9C842FBEFFDB2BA10C1593 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		51A02D1E1E8A368D680C1F25 /* DPIKillerTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DPIKillerTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		527B0CC4FBB730B4A008A88C /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
+		57730A23414F81DE2373966A /* Logging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logging.swift; sourceTree = "<group>"; };
+		86128C7EAB89828D47ECAA48 /* SystemExtensionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemExtensionManager.swift; sourceTree = "<group>"; };
+		899BE7B7C478CF9CD958201E /* Network.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Network.framework; path = System/Library/Frameworks/Network.framework; sourceTree = SDKROOT; };
+		992ACF5ED1140C1505EC2FE6 /* TunnelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunnelManager.swift; sourceTree = "<group>"; };
+		99E07F376C6DF5B21113629F /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
+		A6040315AA8DFDDF17943DEC /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		A8B91A4000F10943366F3399 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		ACC96E1C1E57911FDF9242E3 /* Networking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Networking.swift; sourceTree = "<group>"; };
+		C4B661BA4B3DC334E01E177B /* GitHubUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubUpdater.swift; sourceTree = "<group>"; };
+		C78AA55966132425DC378C83 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
+		D05FC073386ED1D2698E63B8 /* TunnelConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunnelConfiguration.swift; sourceTree = "<group>"; };
+		DAE315BCFD45F1C64570AC83 /* DPIKillerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DPIKillerManager.swift; sourceTree = "<group>"; };
+		FEEEB59BD3FF5DE0D39237CE /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketTunnelProvider.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		1FC96ABCA1A8D09BAC48A1C7 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				733743CB4C4CA16D79FE3EF8 /* Foundation.framework in Frameworks */,
+				7CF9CA9EFC4B8913E4B370F7 /* NetworkExtension.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DD31DF0CE3D1FE98D743C666 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8FB06D66C2C729BC8543FE02 /* AppKit.framework in Frameworks */,
+				2A6990A0D1AA571CF888DB8A /* WebKit.framework in Frameworks */,
+				4B33B3313F97E4B56D02EE75 /* Network.framework in Frameworks */,
+				4A581EF68B4CC3830A24F9EF /* NetworkExtension.framework in Frameworks */,
+				1024AFCCD06A3D1BC1561EF2 /* SystemExtensions.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		382082EF50C0DE8AEFCE79F9 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				22828730B51AD1422458BDD1 /* DPIKiller.app */,
+				51A02D1E1E8A368D680C1F25 /* DPIKillerTunnel.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		3ED92CB6F8A0FE816D1F6BEC /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				6CAAE1455DF20A6FE72CBCEE /* App */,
+				D921478694A246E9A9C74E53 /* Core */,
+				EC890C2759B96615A48D6F31 /* Services */,
+				55C476BE0A10CB03EA8F160B /* Shared */,
+				AD9DD399D2B545C5F620D8D8 /* UI */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		55C476BE0A10CB03EA8F160B /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				D05FC073386ED1D2698E63B8 /* TunnelConfiguration.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		6CAAE1455DF20A6FE72CBCEE /* App */ = {
+			isa = PBXGroup;
+			children = (
+				A6040315AA8DFDDF17943DEC /* AppDelegate.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		9CF883E4025D8083619B0DFD /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				527B0CC4FBB730B4A008A88C /* AppKit.framework */,
+				A8B91A4000F10943366F3399 /* Foundation.framework */,
+				899BE7B7C478CF9CD958201E /* Network.framework */,
+				C78AA55966132425DC378C83 /* NetworkExtension.framework */,
+				2A9DEF37C2A75BEDA797F2DE /* SystemExtensions.framework */,
+				0FD15DD50A898A04599D417B /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		A7523E09E2405155CF4A9430 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				FEEEB59BD3FF5DE0D39237CE /* PacketTunnelProvider.swift */,
+			);
+			name = Sources;
+			path = Extensions/PacketTunnel/Sources;
+			sourceTree = "<group>";
+		};
+		AD9DD399D2B545C5F620D8D8 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				2EB84FBE986F62694C009D2E /* AppTheme.swift */,
+				21F4A1046FB1F2E2057C3012 /* Windows.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		D921478694A246E9A9C74E53 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				05B48A01CCA543395AB0D349 /* BypassEngine.swift */,
+				21CBCB2639DD18798DEE7905 /* Localization.swift */,
+				57730A23414F81DE2373966A /* Logging.swift */,
+				99E07F376C6DF5B21113629F /* SettingsStore.swift */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		EC134F9ECC0E7E561C8B1FFA = {
+			isa = PBXGroup;
+			children = (
+				4C9C842FBEFFDB2BA10C1593 /* main.swift */,
+				3ED92CB6F8A0FE816D1F6BEC /* Sources */,
+				A7523E09E2405155CF4A9430 /* Sources */,
+				9CF883E4025D8083619B0DFD /* Frameworks */,
+				382082EF50C0DE8AEFCE79F9 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		EC890C2759B96615A48D6F31 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				DAE315BCFD45F1C64570AC83 /* DPIKillerManager.swift */,
+				C4B661BA4B3DC334E01E177B /* GitHubUpdater.swift */,
+				ACC96E1C1E57911FDF9242E3 /* Networking.swift */,
+				86128C7EAB89828D47ECAA48 /* SystemExtensionManager.swift */,
+				992ACF5ED1140C1505EC2FE6 /* TunnelManager.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		2FC14EF1B9BE6E637A7F6E7F /* DPIKiller */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EFBBBA33FF9855BDFA5FC981 /* Build configuration list for PBXNativeTarget "DPIKiller" */;
+			buildPhases = (
+				A3EBC7928CA99E14A675D6D7 /* Sources */,
+				DD31DF0CE3D1FE98D743C666 /* Frameworks */,
+				35FEE4E1DB7B55042CF9ADAF /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				21B869D233489C3A882A91B8 /* PBXTargetDependency */,
+			);
+			name = DPIKiller;
+			packageProductDependencies = (
+			);
+			productName = DPIKiller;
+			productReference = 22828730B51AD1422458BDD1 /* DPIKiller.app */;
+			productType = "com.apple.product-type.application";
+		};
+		94FC2B5816687862C8B3E459 /* DPIKillerTunnel */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CDD326D6E9C01BA8862EC209 /* Build configuration list for PBXNativeTarget "DPIKillerTunnel" */;
+			buildPhases = (
+				0D4CD5CB804B1EDAFDB57BD8 /* Sources */,
+				1FC96ABCA1A8D09BAC48A1C7 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DPIKillerTunnel;
+			packageProductDependencies = (
+			);
+			productName = DPIKillerTunnel;
+			productReference = 51A02D1E1E8A368D680C1F25 /* DPIKillerTunnel.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		FC0AC62F7C85429F88D47030 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					2FC14EF1B9BE6E637A7F6E7F = {
+						DevelopmentTeam = 797Z6Y2ACN;
+						ProvisioningStyle = Automatic;
+						SystemCapabilities = {
+							com.apple.NetworkExtensions = {
+								enabled = 1;
+							};
+						};
+					};
+					94FC2B5816687862C8B3E459 = {
+						DevelopmentTeam = 797Z6Y2ACN;
+						ProvisioningStyle = Automatic;
+						SystemCapabilities = {
+							com.apple.NetworkExtensions = {
+								enabled = 1;
+							};
+						};
+					};
+				};
+			};
+			buildConfigurationList = F6FA1900D7577C16B32188FB /* Build configuration list for PBXProject "DPIKiller" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = EC134F9ECC0E7E561C8B1FFA;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 382082EF50C0DE8AEFCE79F9 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				2FC14EF1B9BE6E637A7F6E7F /* DPIKiller */,
+				94FC2B5816687862C8B3E459 /* DPIKillerTunnel */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		0D4CD5CB804B1EDAFDB57BD8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DDE32201B66B2D488ADDF37F /* PacketTunnelProvider.swift in Sources */,
+				1D65BAE6100E2C5C3862A284 /* TunnelConfiguration.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A3EBC7928CA99E14A675D6D7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BDB7180807F41A0F3C0A0854 /* AppDelegate.swift in Sources */,
+				91BC71FDF88B0E8C85BFAF3B /* AppTheme.swift in Sources */,
+				452B79234C7B3F5438B1329C /* BypassEngine.swift in Sources */,
+				DB1FEC94A3EAA9FDDB67B369 /* DPIKillerManager.swift in Sources */,
+				6F5FF1E200484DC5EED50A88 /* GitHubUpdater.swift in Sources */,
+				6515533DE5832A818C028713 /* Localization.swift in Sources */,
+				716F8D4F0F5D5E3EA458C244 /* Logging.swift in Sources */,
+				A6CA6E66D1E103C5A31412E4 /* Networking.swift in Sources */,
+				F4D8946BC3D20CC93265CD5E /* SettingsStore.swift in Sources */,
+				3BA436F4E372488985B5DF4B /* SystemExtensionManager.swift in Sources */,
+				82B69430FE777F74AA8A4832 /* TunnelConfiguration.swift in Sources */,
+				702F910E54DDC32E88E36ADA /* TunnelManager.swift in Sources */,
+				B2EFA72DCB0DA68D1B6EECEA /* Windows.swift in Sources */,
+				D5700B9F8E56D8B4FEE1D27A /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		21B869D233489C3A882A91B8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 94FC2B5816687862C8B3E459 /* DPIKillerTunnel */;
+			targetProxy = 2BC4C6F158B4E9881CC4B672 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		271FB9FCF8E4130ACBD48146 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Extensions/PacketTunnel/PacketTunnel.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Extensions/PacketTunnel/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.antigravity.DPIKiller.PacketTunnel;
+				PRODUCT_NAME = DPIKillerTunnel;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		31FD01F2DAF0C11D85801651 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = DPIKiller.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Xcode/DPIKiller-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.antigravity.DPIKiller;
+				PRODUCT_NAME = DPIKiller;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		38B0571ED235C2A78EF4E207 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = DPIKiller.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Xcode/DPIKiller-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.antigravity.DPIKiller;
+				PRODUCT_NAME = DPIKiller;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		9C60607E391ABFC2AC329EF1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Extensions/PacketTunnel/PacketTunnel.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Extensions/PacketTunnel/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.antigravity.DPIKiller.PacketTunnel;
+				PRODUCT_NAME = DPIKillerTunnel;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		B1860510C9E4EF5EA7EBB702 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 62;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 3.0.62;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		CDEE2EBEA5D19D7B4D211DBC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 62;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 3.0.62;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		CDD326D6E9C01BA8862EC209 /* Build configuration list for PBXNativeTarget "DPIKillerTunnel" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				271FB9FCF8E4130ACBD48146 /* Debug */,
+				9C60607E391ABFC2AC329EF1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		EFBBBA33FF9855BDFA5FC981 /* Build configuration list for PBXNativeTarget "DPIKiller" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				38B0571ED235C2A78EF4E207 /* Debug */,
+				31FD01F2DAF0C11D85801651 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F6FA1900D7577C16B32188FB /* Build configuration list for PBXProject "DPIKiller" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B1860510C9E4EF5EA7EBB702 /* Debug */,
+				CDEE2EBEA5D19D7B4D211DBC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = FC0AC62F7C85429F88D47030 /* Project object */;
+}
