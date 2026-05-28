@@ -1,50 +1,51 @@
-# DPI Killer⚡️
+# DPI Killer
 
 <p align="left">
   <img src="assets/banner.png" alt="DPI Killer Banner" width="800">
 </p>
 
 <p align="left">
-  <a href="#english">English</a> • <a href="#russian">Русский</a>
+  <a href="#english">English</a> | <a href="#russian">Русский</a>
 </p>
 
 ---
 
 <a name="english"></a>
-## English 🇺🇸
-### Professional macOS GUI for `ciadpi` / `spoofdpi` — Bypass DPI & Remove Throttling
 
-**DPI Killer** is a lightweight, high-performance macOS application for bypassing DPI censorship, unblocking websites, and reducing throttling. It now prefers the lighter `ciadpi` backend when available, while keeping `spoofdpi` as a fallback.
+## English
 
-> Love sharing internet from your phone but hate it when your ISP throttles the speed? Many solutions have been tried over the years. This one is simply convenient for Mac users. If you're on Windows... well, my condolences. 😉
+DPI Killer runs `ciadpi` or `spoofdpi` from the macOS menu bar and exposes them as a local DPI-bypass proxy.
 
-It is a **GoodbyeDPI Mac alternative** that restores access to YouTube and blocked resources without speed loss. No terminal or command line knowledge required.
+It wraps the DPI bypass backends behind a menu bar control: start/stop, automatic backend install, runtime port selection, reconnect handling, backend-specific settings, and a VPN-compatible local proxy mode.
 
-### Features
-- **Control**: Start/stop from Menu Bar.
-- **Status**: Visual indicator (🟢/🔴).
-- **Backend Selector**: Choose `Auto`, `ciadpi`, `spoofdpi`, or a custom binary path in Settings.
-- **Auto-Install**: Builds lightweight `ciadpi` automatically and installs official `spoofdpi` as fallback.
-- **Auto-Reconnect**: Restores the backend after connectivity drops when enabled.
-- **Proxy-Aware**: Uses `SOCKS5` for `ciadpi` and `HTTP` proxy mode for `spoofdpi`.
-- **VPN Foundation**: Includes Packet Tunnel + System Extension scaffolding, activation path, and safe fallback when Apple signing is unavailable.
-- **Ultra-Lightweight**: Zero-log silent operation for 0.1% CPU and minimal RAM usage.
-- **Clean State**: Automatically kills orphan processes to prevent conflicts.
-- **Advanced Settings**: Configure backend, TTL, proxy port, DNS behavior, and manual flags.
+## What it does
 
-### Setup
-1. **Download**: Get `.dmg` from [Releases](https://github.com/iddictive/DPI-Killer/releases).
-2. **Install**: Drag to `Applications`.
-3. **Run**: Opens with auto-setup.
-4. **Update**: Use `Check for Updates...` from the menu bar app to install newer builds.
+- Starts and stops the bypass backend from the menu bar.
+- Picks `ciadpi` by default when available, with `spoofdpi` as fallback.
+- Installs or updates managed backend binaries from the app.
+- Uses the right proxy mode for each backend: SOCKS5 for `ciadpi`, HTTP for `spoofdpi`.
+- Falls back to another local port when the preferred port is busy.
+- Can keep only the local proxy exposed for VPN clients such as Shadowrocket or AdGuard.
+- Includes Packet Tunnel / System Extension plumbing for signed builds that can use the VPN path.
+- Lets advanced users set TTL, DNS behavior, proxy port, backend flags, and custom binary paths.
 
-### VPN Compatibility
-To use DPI Killer alongside a VPN (like Shadowrocket, AdGuard, etc.):
-1. Enable **VPN client compatibility** in DPI Killer Settings.
-2. Configure your VPN to use `127.0.0.1:8080` (or your custom port) as the **upstream (parent) proxy**.
-3. This keeps Shadowrocket in charge of routing while DPI Killer provides only the local DPI-bypass proxy.
+## Install
 
-### Uninstall
+1. Download the latest `.dmg` from [Releases](https://github.com/iddictive/DPI-Killer/releases).
+2. Move the app to `Applications`.
+3. Launch it. The app will set up supported backends when needed.
+4. Use `Check for Updates...` from the menu bar app for newer builds.
+
+## VPN client compatibility
+
+To use DPI Killer together with another VPN client:
+
+1. Enable VPN client compatibility in DPI Killer settings.
+2. Configure the VPN client to use `127.0.0.1:8080` as its upstream proxy, or use the runtime port shown by DPI Killer if it picked another port.
+3. Keep routing in the VPN client and let DPI Killer handle only the local DPI-bypass proxy.
+
+## Uninstall
+
 ```bash
 curl -sL https://raw.githubusercontent.com/iddictive/DPI-Killer/main/scripts/uninstall.sh | bash
 ```
@@ -52,43 +53,43 @@ curl -sL https://raw.githubusercontent.com/iddictive/DPI-Killer/main/scripts/uni
 ---
 
 <a name="russian"></a>
-## Русский 🇷🇺
-### Нативный GUI для `ciadpi` / `spoofdpi` — Обход DPI и снятие ограничений скорости
 
-**DPI Killer** — лёгкое и производительное приложение для macOS для обхода DPI и снятия ограничений скорости. По умолчанию оно использует более лёгкий `ciadpi`, а `spoofdpi` остаётся совместимым fallback.
+## Русский
 
-> Любите раздавать интернет с телефона, но провайдер режет скорость? Давно было много разных решений, но это — просто удобное для тех, у кого Mac. Для тех, у кого Windows — соболезную. 😉
+DPI Killer запускает `ciadpi` или `spoofdpi` из macOS menu bar и поднимает локальный proxy для обхода DPI.
 
-**Альтернатива GoodbyeDPI для Mac**, возвращает доступ к YouTube и заблокированным ресурсам одним кликом. Работает без терминала.
+Это Mac-обертка над рабочими DPI-bypass backend-ами: управление start/stop, автоустановка backend-а, выбор свободного runtime-порта, reconnect, настройки под конкретный backend и режим локального proxy для работы рядом с VPN-клиентом.
 
-### Возможности
-- **Управление**: Старт/стоп из менюбара.
-- **Статус**: Цветной индикатор (🟢/🔴).
-- **Выбор backend-а**: В настройках можно выбрать `Авто`, `ciadpi`, `spoofdpi` или свой путь к бинарю.
-- **Auto-установка**: Сам соберёт лёгкий `ciadpi` и установит официальный `spoofdpi` как fallback.
-- **Авто-реконнект**: Может восстановить backend после пропадания сети.
-- **Корректный proxy-режим**: Для `ciadpi` использует `SOCKS5`, для `spoofdpi` — `HTTP` proxy.
-- **Основа для VPN/TUN**: В репе уже есть Packet Tunnel, System Extension activation path и безопасный fallback, если Apple signing ещё не готов.
-- **Максимальная легкость**: Работает бесшумно без записи логов, потребляя ~0.1% CPU и минимум RAM.
-- **Чистый запуск**: Автоматически завершает старые backend-процессы для избежания конфликтов.
-- **Расширенные настройки**: Backend, TTL, порт, DNS-поведение и ручные флаги.
+## Что умеет приложение
 
-### Установка
-1. **Скачать**: `.dmg` со страницы [Релизов](https://github.com/iddictive/DPI-Killer/releases).
-2. **Установить**: Перетянуть в `Applications`.
-3. **Запуск**: Готов к работе сразу.
-4. **Обновления**: Новую сборку можно поставить через пункт `Проверить обновления...` в меню приложения.
+- Запуск и остановка backend-а из menu bar.
+- `ciadpi` по умолчанию, если он доступен; `spoofdpi` остается fallback.
+- Установка и обновление managed backend binaries из приложения.
+- Правильный proxy-режим для каждого backend-а: SOCKS5 для `ciadpi`, HTTP для `spoofdpi`.
+- Переход на другой локальный порт, если preferred port занят.
+- Режим совместимости с VPN-клиентами вроде Shadowrocket или AdGuard.
+- Packet Tunnel / System Extension основа для подписанных сборок с VPN path.
+- Настройки TTL, DNS, proxy port, backend flags и custom binary path.
 
-### Совместимость с VPN
-Чтобы использовать DPI Killer вместе с VPN (Shadowrocket, AdGuard и т.д.):
-1. Включите **Совместимость с VPN-клиентами** в настройках DPI Killer.
-2. В самом VPN-клиенте укажите `127.0.0.1:8080` (или ваш порт) в качестве **родительского (upstream) прокси**.
-3. Так Shadowrocket отвечает за маршрутизацию, а DPI Killer остаётся локальным proxy для обхода DPI.
+## Установка
 
-### Удаление
+1. Скачайте последнюю `.dmg` сборку в [Releases](https://github.com/iddictive/DPI-Killer/releases).
+2. Перенесите приложение в `Applications`.
+3. Запустите его. Приложение поставит поддерживаемые backend-ы, если они нужны.
+4. Обновления ставятся через `Check for Updates...` в menu bar.
+
+## Совместимость с VPN-клиентами
+
+Чтобы использовать DPI Killer вместе с другим VPN-клиентом:
+
+1. Включите VPN client compatibility в настройках DPI Killer.
+2. Укажите в VPN-клиенте `127.0.0.1:8080` как upstream proxy или используйте runtime port, который показывает DPI Killer, если приложение выбрало другой порт.
+3. Оставьте маршрутизацию VPN-клиенту; DPI Killer будет отвечать только за локальный DPI-bypass proxy.
+
+## Удаление
+
 ```bash
 curl -sL https://raw.githubusercontent.com/iddictive/DPI-Killer/main/scripts/uninstall.sh | bash
 ```
 
----
 MIT License.
