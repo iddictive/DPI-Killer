@@ -8,6 +8,12 @@
   <a href="#english">English</a> • <a href="#russian">Русский</a>
 </p>
 
+## Interface Snapshot
+
+<p align="center">
+  <img src="assets/interface-network.png" alt="DPI Killer network settings interface" width="860">
+</p>
+
 ---
 
 <a id="english"></a>
