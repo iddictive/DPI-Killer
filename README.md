@@ -1,7 +1,7 @@
 # DPI Killer
 
 <p align="center">
-  <img src="assets/banner.png" alt="DPI Killer banner" width="860">
+  <img src="https://cdn.jsdelivr.net/gh/iddictive/DPI-Killer@main/assets/banner.png" alt="DPI Killer banner" width="860">
 </p>
 
 <p align="center">
@@ -11,7 +11,7 @@
 ## Interface Snapshot
 
 <p align="center">
-  <img src="assets/interface-network.png" alt="DPI Killer network settings interface" width="860">
+  <img src="https://cdn.jsdelivr.net/gh/iddictive/DPI-Killer@main/assets/interface-network.png" alt="DPI Killer network settings interface" width="860">
 </p>
 
 ---
