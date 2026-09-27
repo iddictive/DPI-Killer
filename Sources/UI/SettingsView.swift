@@ -12,7 +12,7 @@ enum DPISettingsTokens {
     static let cornerRadius: CGFloat = 8
     static let sidebarCornerRadius: CGFloat = 12
     static let rowSpacing: CGFloat = 12
-    static let cardSpacing: CGFloat = 14
+    static let cardSpacing: CGFloat = 20
 
     static let background = Color(nsColor: AppTheme.settingsBackground)
     static let sidebar = Color(nsColor: AppTheme.settingsSidebar)
@@ -153,15 +153,14 @@ struct SettingsCard<Content: View>: View {
                 }
             }
 
-            content
+            VStack(alignment: .leading, spacing: DPISettingsTokens.rowSpacing) {
+                content
+            }
+            .padding(DPISettingsTokens.cardPadding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: DPISettingsTokens.cornerRadius).fill(DPISettingsTokens.surface))
         }
-        .padding(DPISettingsTokens.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: DPISettingsTokens.cornerRadius)
-                .fill(DPISettingsTokens.surface)
-        )
-
     }
 }
 
@@ -265,6 +264,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: DPISettingsTokens.cardSpacing) {
                         tabContent
                     }
+                    .id(viewModel.selectedTab)
                     .padding(DPISettingsTokens.contentPadding)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
@@ -282,7 +282,7 @@ struct SettingsView: View {
                 onSave: save
             )
         }
-        .frame(minWidth: 780, idealWidth: 780, minHeight: 580, idealHeight: 580)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(SettingsMaterialBackground().ignoresSafeArea())
         .onAppear {
             viewModel.refreshRuntimeStatus()
@@ -328,20 +328,31 @@ struct SettingsView: View {
                     }
                 }
 
-                SettingsRow(viewModel.backendPathLabel, help: viewModel.backendSelection == .custom ? L10n.shared.tipBinaryPath : L10n.shared.backendPathHint) {
-                    if viewModel.backendSelection == .custom {
+                if viewModel.backendSelection == .custom {
+                    SettingsRow(viewModel.backendPathLabel) {
                         TextField(L10n.shared.binaryPlaceholder, text: $viewModel.customBinaryPath)
                             .textFieldStyle(.roundedBorder)
-                    } else {
-                        pathText(viewModel.resolvedBinaryPath)
                     }
                 }
+                if !FileManager.default.isExecutableFile(atPath: viewModel.resolvedBinaryPath) {
+                    Text(L10n.shared.backendMissingSuffix)
+                        .font(DPISettingsTokens.captionFont)
+                        .foregroundStyle(DPISettingsTokens.warning)
+                }
+                DisclosureGroup(text(ru: "Подробности", en: "Details")) {
+                    pathText(viewModel.resolvedBinaryPath)
+                    Text(viewModel.resolvedEngine.proxyDescription)
+                        .foregroundStyle(.secondary)
+                }
+                .font(DPISettingsTokens.captionFont)
 
-                compatibilityBadges
             }
 
-            ciadpiMaintenanceCard
-            spoofdpiVersionCard
+            SettingsCard(title: text(ru: "Обновления движков", en: "Engine Updates")) {
+                ciadpiMaintenanceCard
+                Divider()
+                spoofdpiVersionCard
+            }
         }
     }
 
@@ -390,8 +401,7 @@ struct SettingsView: View {
 
     private var bypassTab: some View {
         SettingsCard(
-            title: L10n.shared.sectionDPI,
-            subtitle: text(ru: "Флаги и параметры обхода DPI.", en: "DPI bypass flags and tuning.")
+            title: L10n.shared.sectionDPI
         ) {
             SettingsRow(text(ru: "Пресет", en: "Preset")) {
                 Picker("", selection: $viewModel.selectedPreset) {
@@ -407,46 +417,16 @@ struct SettingsView: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text(text(ru: "Managed flags", en: "Managed flags"))
-                    .font(DPISettingsTokens.labelFont)
-                    .foregroundStyle(DPISettingsTokens.secondaryText)
-                    .padding(.leading, 18)
-
-                ForEach(viewModel.options) { option in
-                    Toggle(isOn: Binding(
-                        get: { viewModel.flagEnabled(option.flag) },
-                        set: { viewModel.setFlag(option.flag, enabled: $0) }
-                    )) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 8) {
-                                Text(viewModel.optionTitle(option.flag))
-                                    .font(DPISettingsTokens.bodyFont)
-
-                                SettingsBadge(title: option.flag, style: .neutral)
-
-                                if !viewModel.flagSupported(option.flag) {
-                                    SettingsBadge(title: text(ru: "Недоступно", en: "Unavailable"), style: .warning)
-                                }
-                            }
-
-                            Text(option.description)
-                                .font(DPISettingsTokens.captionFont)
-                                .foregroundStyle(DPISettingsTokens.secondaryText)
-
-                            if !viewModel.flagSupported(option.flag) {
-                                Text(viewModel.unsupportedReason(for: option.flag))
-                                    .font(DPISettingsTokens.captionFont)
-                                    .foregroundStyle(DPISettingsTokens.warning)
-                            }
-                        }
-                    }
-                    .toggleStyle(.checkbox)
-                    .disabled(!viewModel.flagSupported(option.flag))
-                    .opacity(viewModel.flagSupported(option.flag) ? 1 : 0.55)
-                    .padding(.leading, 18)
-                }
+            Divider()
+            ForEach(viewModel.options.filter { viewModel.flagSupported($0.flag) }) { option in
+                Toggle(viewModel.optionTitle(option.flag), isOn: Binding(
+                    get: { viewModel.flagEnabled(option.flag) },
+                    set: { viewModel.setFlag(option.flag, enabled: $0) }
+                ))
+                .toggleStyle(.checkbox)
+                .help(option.description)
             }
+            Divider()
 
             SettingsRow(L10n.shared.ttlTitle, help: L10n.shared.tipTTL) {
                 TextField(L10n.shared.ttlPlaceholder, text: $viewModel.defaultTTL)
@@ -472,18 +452,13 @@ struct SettingsView: View {
 
             SettingsRow(L10n.shared.httpsFakeCount, help: L10n.shared.tipFakeCount) {
                 if viewModel.resolvedEngine == .ciadpi {
-                    HStack(spacing: 8) {
-                        Toggle("", isOn: Binding(
-                            get: { viewModel.ciadpiFakeEnabled },
-                            set: { viewModel.ciadpiFakeEnabled = $0 }
-                        ))
-                        .toggleStyle(.checkbox)
-                        .labelsHidden()
+                    Toggle("", isOn: Binding(
+                        get: { viewModel.ciadpiFakeEnabled },
+                        set: { viewModel.ciadpiFakeEnabled = $0 }
+                    ))
+                    .toggleStyle(.checkbox)
+                    .labelsHidden()
 
-                        Text(text(ru: "boolean trigger: --fake -1 --ttl 8", en: "boolean trigger: --fake -1 --ttl 8"))
-                            .font(DPISettingsTokens.captionFont)
-                            .foregroundStyle(DPISettingsTokens.secondaryText)
-                    }
                 } else {
                     TextField("0", text: $viewModel.httpsFakeCount)
                         .textFieldStyle(.roundedBorder)
@@ -491,19 +466,11 @@ struct SettingsView: View {
                 }
             }
 
-            SettingsRow(
-                L10n.shared.httpsChunkSize,
-                help: viewModel.chunkSizeAvailable ? L10n.shared.tipChunkSize : text(ru: "Только spoofdpi.", en: "spoofdpi only.")
-            ) {
-                HStack(spacing: 8) {
+            if viewModel.chunkSizeAvailable {
+                SettingsRow(L10n.shared.httpsChunkSize, help: L10n.shared.tipChunkSize) {
                     TextField(L10n.shared.httpsChunkPlaceholder, text: $viewModel.httpsChunkSize)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 90)
-                        .disabled(!viewModel.chunkSizeAvailable)
-
-                    if !viewModel.chunkSizeAvailable {
-                        SettingsBadge(title: text(ru: "spoofdpi", en: "spoofdpi"), style: .warning)
-                    }
                 }
             }
         }
@@ -607,52 +574,14 @@ struct SettingsView: View {
     }
 
     private var ciadpiMaintenanceCard: some View {
-        SettingsCard(
-            title: "ciadpi",
-            subtitle: text(ru: "Версия managed ciadpi и действия обновления.", en: "Managed ciadpi version and update actions.")
-        ) {
-            SettingsRow(text(ru: "Выбран:", en: "Selected:")) {
-                pathText(viewModel.ciadpiSelectedPath)
-            }
-
-            SettingsRow(text(ru: "Managed:", en: "Managed:")) {
-                pathText(viewModel.ciadpiManagedPath)
-            }
-
-            SettingsRow(text(ru: "Версия:", en: "Version:")) {
-                Text(viewModel.ciadpiManagedVersion)
-                    .font(DPISettingsTokens.captionFont)
-                    .foregroundStyle(DPISettingsTokens.secondaryText)
-            }
-
-            SettingsRow(text(ru: "Последняя:", en: "Latest:")) {
-                Text(viewModel.ciadpiLatestVersion)
-                    .font(DPISettingsTokens.captionFont)
-                    .foregroundStyle(DPISettingsTokens.secondaryText)
-            }
-
-            HStack(spacing: 10) {
-                Text(viewModel.ciadpiStatusMessage)
-                    .font(DPISettingsTokens.captionFont)
-                    .foregroundStyle(viewModel.ciadpiStatusStyle.color)
-                    .lineLimit(2)
-
-                Spacer(minLength: 12)
-
-                Button(text(ru: "Проверить", en: "Check")) {
-                    viewModel.checkCiadpiVersion()
-                }
-                .buttonStyle(.bordered)
-                .disabled(viewModel.isCheckingCiadpi || viewModel.isUpdatingCiadpi)
-
-                Button(text(ru: "Обновить ciadpi", en: "Update ciadpi")) {
-                    viewModel.updateCiadpi()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!viewModel.canUpdateCiadpi || viewModel.isCheckingCiadpi || viewModel.isUpdatingCiadpi)
-            }
-            .padding(.leading, DPISettingsTokens.rowLabelWidth + 12)
-        }
+        engineMaintenanceRow(
+            name: "ciadpi", version: viewModel.ciadpiManagedVersion,
+            latest: viewModel.ciadpiLatestVersion, path: viewModel.ciadpiManagedPath,
+            message: viewModel.ciadpiStatusMessage, style: viewModel.ciadpiStatusStyle,
+            busy: viewModel.isCheckingCiadpi || viewModel.isUpdatingCiadpi,
+            canUpdate: viewModel.canUpdateCiadpi,
+            check: viewModel.checkCiadpiVersion, update: viewModel.updateCiadpi
+        )
     }
 
     private var manualTab: some View {
@@ -707,51 +636,49 @@ struct SettingsView: View {
     }
 
     private var spoofdpiVersionCard: some View {
-        SettingsCard(
-            title: L10n.shared.spoofdpiMaintenanceTitle,
-            subtitle: text(ru: "Версия managed SpoofDPI и действия обновления.", en: "Managed SpoofDPI version and update actions.")
-        ) {
-            SettingsRow(L10n.shared.spoofdpiSelectedPath) {
-                pathText(viewModel.spoofdpiSelectedPath)
-            }
+        engineMaintenanceRow(
+            name: "SpoofDPI", version: viewModel.spoofdpiManagedVersion,
+            latest: viewModel.spoofdpiLatestVersion, path: viewModel.spoofdpiManagedPath,
+            message: viewModel.spoofdpiStatusMessage, style: viewModel.spoofdpiStatusStyle,
+            busy: viewModel.isCheckingSpoofdpi || viewModel.isUpdatingSpoofdpi,
+            canUpdate: viewModel.canUpdateSpoofdpi,
+            check: viewModel.checkSpoofdpiVersion, update: viewModel.updateSpoofdpi
+        )
+    }
 
-            SettingsRow(L10n.shared.spoofdpiManagedPath) {
-                pathText(viewModel.spoofdpiManagedPath)
-            }
-
-            SettingsRow(L10n.shared.spoofdpiVersionTitle) {
-                Text(viewModel.spoofdpiManagedVersion)
-                    .font(DPISettingsTokens.captionFont)
-                    .foregroundStyle(DPISettingsTokens.secondaryText)
-            }
-
-            SettingsRow(L10n.shared.spoofdpiLatestTitle) {
-                Text(viewModel.spoofdpiLatestVersion)
-                    .font(DPISettingsTokens.captionFont)
-                    .foregroundStyle(DPISettingsTokens.secondaryText)
-            }
-
-            HStack(spacing: 10) {
-                Text(viewModel.spoofdpiStatusMessage)
-                    .font(DPISettingsTokens.captionFont)
-                    .foregroundStyle(viewModel.spoofdpiStatusStyle.color)
-                    .lineLimit(2)
-
-                Spacer(minLength: 12)
-
-                Button(L10n.shared.spoofdpiCheck) {
-                    viewModel.checkSpoofdpiVersion()
+    private func engineMaintenanceRow(
+        name: String, version: String, latest: String, path: String,
+        message: String, style: SettingsBadgeStyle, busy: Bool, canUpdate: Bool,
+        check: @escaping () -> Void, update: @escaping () -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(name).font(DPISettingsTokens.bodyFont)
+                Text(version).font(DPISettingsTokens.captionFont).foregroundStyle(.secondary)
+                Spacer()
+                if busy { ProgressView().controlSize(.small) }
+                Button(text(ru: "Проверить", en: "Check"), action: check)
+                    .disabled(busy)
+                if canUpdate {
+                    Button(text(ru: "Обновить", en: "Update"), action: update)
+                        .disabled(busy)
                 }
-                .buttonStyle(.bordered)
-                .disabled(viewModel.isCheckingSpoofdpi || viewModel.isUpdatingSpoofdpi)
-
-                Button(L10n.shared.spoofdpiUpdate) {
-                    viewModel.updateSpoofdpi()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!viewModel.canUpdateSpoofdpi || viewModel.isCheckingSpoofdpi || viewModel.isUpdatingSpoofdpi)
             }
-            .padding(.leading, DPISettingsTokens.rowLabelWidth + 12)
+            .buttonStyle(.bordered)
+            if style != .neutral || busy {
+                Text(message)
+                    .font(DPISettingsTokens.captionFont)
+                    .foregroundStyle(style.color)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            DisclosureGroup(text(ru: "Подробности", en: "Details")) {
+                pathText(path)
+                if latest != L10n.shared.versionUnknown {
+                    Text(text(ru: "Последняя версия: \(latest)", en: "Latest version: \(latest)"))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .font(DPISettingsTokens.captionFont)
         }
     }
 

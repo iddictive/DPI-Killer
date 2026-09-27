@@ -311,28 +311,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.autoenablesItems = false
         let runtimeStatus = currentRuntimeStatus()
-        menu.addItem(disabledMenuItem(title: L10n.shared.menuRuntimeSection))
-        menu.addItem(disabledMenuItem(title: statusTitle(for: runtimeStatus)))
-        menu.addItem(disabledMenuItem(title: "\(L10n.shared.runtimeModeTitle) \(runtimeModeTitle())"))
-        menu.addItem(disabledMenuItem(title: "\(L10n.shared.backendRuntimeTitle) \(backendRuntimeTitle())"))
-        if SettingsStore.shared.isNetworkOptimizationApplied() {
-            menu.addItem(disabledMenuItem(title: L10n.shared.networkOptimizationActive))
-        } else {
-            menu.addItem(actionMenuItem(title: L10n.shared.networkOptimizationApply, action: #selector(applyNetworkOptimization), key: ""))
-        }
-
-        menu.addItem(NSMenuItem.separator())
+        let status = DPIKillerManager.shared.isUsingProxyFallback
+            ? "\(statusTitle(for: runtimeStatus)) · \(L10n.shared.runtimeModeProxyFallback)"
+            : statusTitle(for: runtimeStatus)
+        menu.addItem(disabledMenuItem(title: status))
         menu.addItem(actionMenuItem(title: isModeRunning() ? L10n.shared.stop : L10n.shared.start, action: #selector(toggle), key: "t"))
 
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(disabledMenuItem(title: L10n.shared.menuToolsSection))
         menu.addItem(actionMenuItem(title: L10n.shared.settings, action: #selector(showSettings), key: ","))
-        menu.addItem(actionMenuItem(title: L10n.shared.diagTitle, action: #selector(runDiagnostics), key: "d"))
-        menu.addItem(actionMenuItem(title: L10n.shared.speedTest, action: #selector(showSpeedTest), key: "s"))
-        menu.addItem(actionMenuItem(title: L10n.shared.logsTitle, action: #selector(showLogs), key: "l"))
 
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(disabledMenuItem(title: L10n.shared.menuUpdateSection))
+        let toolsItem = NSMenuItem(title: L10n.shared.menuToolsSection, action: nil, keyEquivalent: "")
+        let toolsMenu = NSMenu(title: L10n.shared.menuToolsSection)
+        toolsMenu.autoenablesItems = false
+        toolsMenu.addItem(actionMenuItem(title: L10n.shared.diagTitle, action: #selector(runDiagnostics), key: "d"))
+        toolsMenu.addItem(actionMenuItem(title: L10n.shared.speedTest, action: #selector(showSpeedTest), key: "s"))
+        toolsMenu.addItem(actionMenuItem(title: L10n.shared.logsTitle, action: #selector(showLogs), key: "l"))
+        if !SettingsStore.shared.isNetworkOptimizationApplied() {
+            toolsMenu.addItem(NSMenuItem.separator())
+            toolsMenu.addItem(actionMenuItem(title: L10n.shared.networkOptimizationApply, action: #selector(applyNetworkOptimization), key: ""))
+        }
+        toolsItem.submenu = toolsMenu
+        menu.addItem(toolsItem)
         menu.addItem(actionMenuItem(title: L10n.shared.updateCheck, action: #selector(checkUpdate), key: "u"))
         menu.addItem(actionMenuItem(title: L10n.shared.instructions, action: #selector(showHelp), key: "h"))
 

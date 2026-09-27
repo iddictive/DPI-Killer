@@ -37,6 +37,7 @@ enum AppTheme {
     static func styleSettingsWindow(_ window: NSWindow?, minSize: NSSize? = nil) {
         guard let window else { return }
         window.appearance = nil
+        window.styleMask.insert(.fullSizeContentView)
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .visible
         window.isMovableByWindowBackground = true

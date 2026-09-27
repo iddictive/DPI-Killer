@@ -35,7 +35,7 @@ final class SettingsWindowController: NSWindowController {
     convenience init() {
         let window = FixedSizeWindow(
             contentRect: NSRect(origin: .zero, size: SettingsWindowController.defaultContentSize),
-            styleMask: [.titled, .closable, .miniaturizable, .utilityWindow],
+            styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
