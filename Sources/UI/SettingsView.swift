@@ -73,7 +73,6 @@ struct SettingsBadge: View {
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
             .background(Capsule().fill(style.color.opacity(0.12)))
-            .overlay(Capsule().stroke(style.color.opacity(0.24), lineWidth: 1))
     }
 }
 
@@ -81,67 +80,29 @@ struct SettingsSidebar: View {
     @Binding var selectedTab: SettingsTab
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 10) {
-                if let icon = DPISettingsAssets.appIcon() {
-                    Image(nsImage: icon)
-                        .resizable()
-                        .interpolation(.high)
-                        .frame(width: 30, height: 30)
-                        .clipShape(RoundedRectangle(cornerRadius: 7))
-                }
-
-                Text("DPI Killer")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(DPISettingsTokens.primaryText)
-                    .lineLimit(1)
-
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 10)
-            .frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
-            .padding(.bottom, 8)
-
+        List(selection: $selectedTab) {
             ForEach(SettingsTab.allCases) { tab in
-                Button {
-                    selectedTab = tab
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: tab.systemImage)
-                            .font(.system(size: 12, weight: .medium))
-                            .frame(width: 15)
-
-                        Text(tab.title)
-                            .font(.system(size: 13, weight: selectedTab == tab ? .semibold : .regular))
-                            .lineLimit(1)
-
-                        Spacer(minLength: 0)
-                    }
-                    .foregroundStyle(selectedTab == tab ? DPISettingsTokens.primaryText : DPISettingsTokens.secondaryText)
-                    .padding(.horizontal, 12)
-                    .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
-                    .contentShape(Rectangle())
-                    .background(
-                        RoundedRectangle(cornerRadius: 7)
-                            .fill(selectedTab == tab ? DPISettingsTokens.accent.opacity(0.22) : .clear)
-                    )
-                }
-                .buttonStyle(.plain)
+                Label(tab.title, systemImage: tab.systemImage)
+                    .tag(tab)
             }
-
-            Spacer(minLength: 0)
         }
-        .padding(12)
+        .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .padding(.top, 8)
         .frame(width: DPISettingsTokens.sidebarWidth)
-        .background(
-            RoundedRectangle(cornerRadius: DPISettingsTokens.sidebarCornerRadius)
-                .fill(DPISettingsTokens.sidebar)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: DPISettingsTokens.sidebarCornerRadius)
-                .stroke(DPISettingsTokens.border, lineWidth: 1)
-        )
     }
+}
+
+struct SettingsMaterialBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .sidebar
+        view.blendingMode = .behindWindow
+        view.state = .followsWindowActiveState
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
 }
 
 enum DPISettingsAssets {
@@ -200,10 +161,7 @@ struct SettingsCard<Content: View>: View {
             RoundedRectangle(cornerRadius: DPISettingsTokens.cornerRadius)
                 .fill(DPISettingsTokens.surface)
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: DPISettingsTokens.cornerRadius)
-                .stroke(DPISettingsTokens.border, lineWidth: 1)
-        )
+
     }
 }
 
@@ -267,6 +225,7 @@ struct SettingsFooter: View {
 
             Button(cancelTitle, action: onCancel)
                 .buttonStyle(.bordered)
+                .keyboardShortcut(.cancelAction)
 
             Button(saveTitle, action: onSave)
                 .buttonStyle(.borderedProminent)
@@ -297,8 +256,10 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: DPISettingsTokens.shellPadding) {
+            HStack(spacing: 0) {
                 SettingsSidebar(selectedTab: $viewModel.selectedTab)
+
+                Divider()
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: DPISettingsTokens.cardSpacing) {
@@ -309,11 +270,8 @@ struct SettingsView: View {
                 }
                 .background(DPISettingsTokens.background)
             }
-            .padding(DPISettingsTokens.shellPadding)
 
-            Rectangle()
-                .fill(DPISettingsTokens.separator)
-                .frame(height: 1)
+            Divider()
 
             SettingsFooter(
                 statusText: viewModel.footerStatusText,
@@ -325,8 +283,7 @@ struct SettingsView: View {
             )
         }
         .frame(minWidth: 780, idealWidth: 780, minHeight: 580, idealHeight: 580)
-        .background(DPISettingsTokens.background)
-        .foregroundStyle(DPISettingsTokens.primaryText)
+        .background(SettingsMaterialBackground().ignoresSafeArea())
         .onAppear {
             viewModel.refreshRuntimeStatus()
             viewModel.refreshCiadpiLocalStatus()
@@ -355,8 +312,7 @@ struct SettingsView: View {
     private var backendTab: some View {
         VStack(alignment: .leading, spacing: DPISettingsTokens.cardSpacing) {
             SettingsCard(
-                title: L10n.shared.sectionCore,
-                subtitle: text(ru: "Выбор движка и базовая конфигурация запуска.", en: "Backend selection and launch configuration.")
+                title: L10n.shared.sectionCore
             ) {
                 SettingsRow(L10n.shared.backendModeTitle) {
                     Picker("", selection: $viewModel.backendSelection) {
@@ -370,13 +326,6 @@ struct SettingsView: View {
                     .onChange(of: viewModel.backendSelection) { _ in
                         viewModel.backendSelectionChanged()
                     }
-                }
-
-                SettingsRow(L10n.shared.backendSummaryTitle) {
-                    Text(viewModel.backendSummary)
-                        .font(DPISettingsTokens.captionFont)
-                        .foregroundStyle(DPISettingsTokens.secondaryText)
-                        .lineLimit(2)
                 }
 
                 SettingsRow(viewModel.backendPathLabel, help: viewModel.backendSelection == .custom ? L10n.shared.tipBinaryPath : L10n.shared.backendPathHint) {
@@ -398,8 +347,7 @@ struct SettingsView: View {
 
     private var networkTab: some View {
         SettingsCard(
-            title: L10n.shared.sectionNetwork,
-            subtitle: text(ru: "Порт, режим прокси и быстрые сетевые действия.", en: "Port, proxy mode, and quick network actions.")
+            title: L10n.shared.sectionNetwork
         ) {
             SettingsRow(L10n.shared.portTitle, help: L10n.shared.tipLocalPort) {
                 TextField(L10n.shared.portPlaceholder, text: $viewModel.localPort)
@@ -424,7 +372,7 @@ struct SettingsView: View {
                 }
             }
 
-            HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 8) {
                 Button(L10n.shared.mobilePresetTitle) {
                     viewModel.applyMobilePreset()
                 }
@@ -437,7 +385,6 @@ struct SettingsView: View {
                 .buttonStyle(.bordered)
                 .disabled(viewModel.isApplyingNetworkOptimization)
             }
-            .padding(.leading, DPISettingsTokens.rowLabelWidth + 12)
         }
     }
 
@@ -601,56 +548,61 @@ struct SettingsView: View {
     }
 
     private var appTab: some View {
-        SettingsCard(
-            title: L10n.shared.sectionApp,
-            subtitle: text(ru: "Поведение приложения и системная интеграция.", en: "App behavior and system integration.")
-        ) {
-            appToggle(title: L10n.shared.launchAtLogin, isOn: $viewModel.launchAtLogin)
-            appToggle(title: L10n.shared.autoUpdateToggle, isOn: $viewModel.autoUpdate)
-            appToggle(title: L10n.shared.autoDownloadToggle, isOn: $viewModel.autoDownload)
-            appToggle(title: L10n.shared.disableIpv6, help: L10n.shared.ipv6Warning, isOn: $viewModel.disableIpv6)
-            appToggle(title: L10n.shared.autoReconnect, help: L10n.shared.tipAutoReconnect, isOn: $viewModel.autoReconnect)
-            appToggle(title: L10n.shared.vpnClientCompatibility, help: L10n.shared.tipVPNClientCompatibility, isOn: $viewModel.vpnClientCompatibilityEnabled)
-
-            if viewModel.vpnClientCompatibilityEnabled {
-                Text(viewModel.vpnClientCompatibilityStatus)
-                    .font(DPISettingsTokens.captionFont)
-                    .foregroundStyle(DPISettingsTokens.secondaryText)
-                    .padding(.leading, DPISettingsTokens.rowLabelWidth + 12)
+        VStack(alignment: .leading, spacing: DPISettingsTokens.cardSpacing) {
+            SettingsCard(title: L10n.shared.sectionApp) {
+                appToggle(title: L10n.shared.launchAtLogin, isOn: $viewModel.launchAtLogin)
+                appToggle(title: L10n.shared.autoUpdateToggle, isOn: $viewModel.autoUpdate)
+                appToggle(title: L10n.shared.autoDownloadToggle, isOn: $viewModel.autoDownload)
             }
 
-            Button(viewModel.isConfiguringShadowrocket ? L10n.shared.configuringShadowrocket : L10n.shared.configureShadowrocket) {
-                viewModel.configureShadowrocket()
-            }
-            .buttonStyle(.bordered)
-            .disabled(viewModel.isConfiguringShadowrocket || viewModel.isApplyingNetworkOptimization)
-            .padding(.leading, DPISettingsTokens.rowLabelWidth + 12)
+            SettingsCard(title: text(ru: "Сетевая совместимость", en: "Network Compatibility")) {
+                appToggle(title: L10n.shared.disableIpv6, help: L10n.shared.ipv6Warning, isOn: $viewModel.disableIpv6)
+                appToggle(title: L10n.shared.autoReconnect, help: L10n.shared.tipAutoReconnect, isOn: $viewModel.autoReconnect)
+                appToggle(title: L10n.shared.vpnClientCompatibility, help: L10n.shared.tipVPNClientCompatibility, isOn: $viewModel.vpnClientCompatibilityEnabled)
 
-            Toggle(isOn: $viewModel.vpnModeEnabled) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(L10n.shared.vpnModeToggle)
-                        .font(DPISettingsTokens.bodyFont)
-
-                    Text(L10n.shared.tipVPNMode)
+                if viewModel.vpnClientCompatibilityEnabled {
+                    Text(viewModel.vpnClientCompatibilityStatus)
                         .font(DPISettingsTokens.captionFont)
                         .foregroundStyle(DPISettingsTokens.secondaryText)
+                        .padding(.leading, DPISettingsTokens.rowLabelWidth + 12)
                 }
-            }
-            .toggleStyle(.checkbox)
-            .disabled(!viewModel.vpnAvailable || viewModel.vpnClientCompatibilityEnabled)
-            .opacity(viewModel.vpnAvailable && !viewModel.vpnClientCompatibilityEnabled ? 1 : 0.55)
-            .padding(.leading, 18)
 
-            HStack(spacing: 8) {
-                SettingsBadge(title: viewModel.vpnStatusTitle, style: viewModel.vpnBadgeStyle)
-
-                Button(text(ru: "Проверить доступ", en: "Check Access")) {
-                    viewModel.ensureSystemExtensionActivated()
+                Button(viewModel.isConfiguringShadowrocket ? L10n.shared.configuringShadowrocket : L10n.shared.configureShadowrocket) {
+                    viewModel.configureShadowrocket()
                 }
                 .buttonStyle(.bordered)
-                .disabled(viewModel.isActivatingSystemExtension)
+                .disabled(viewModel.isConfiguringShadowrocket || viewModel.isApplyingNetworkOptimization)
+                .padding(.leading, DPISettingsTokens.rowLabelWidth + 12)
+
+                Toggle(isOn: $viewModel.vpnModeEnabled) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L10n.shared.vpnModeToggle)
+                            .font(DPISettingsTokens.bodyFont)
+
+                        Text(L10n.shared.tipVPNMode)
+                            .font(DPISettingsTokens.captionFont)
+                            .foregroundStyle(DPISettingsTokens.secondaryText)
+                    }
+                }
+                .toggleStyle(.checkbox)
+                .disabled(!viewModel.vpnAvailable || viewModel.vpnClientCompatibilityEnabled)
+                .opacity(viewModel.vpnAvailable && !viewModel.vpnClientCompatibilityEnabled ? 1 : 0.55)
+                .padding(.leading, 18)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(viewModel.vpnStatusTitle)
+                        .font(DPISettingsTokens.captionFont)
+                        .foregroundStyle(viewModel.vpnBadgeStyle.color)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Button(text(ru: "Проверить доступ", en: "Check Access")) {
+                        viewModel.ensureSystemExtensionActivated()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(viewModel.isActivatingSystemExtension)
+                }
+                .padding(.leading, DPISettingsTokens.rowLabelWidth + 12)
             }
-            .padding(.leading, DPISettingsTokens.rowLabelWidth + 12)
         }
     }
 

@@ -2,22 +2,23 @@ import Cocoa
 
 enum AppTheme {
     static let accent = NSColor.controlAccentColor
-    static let accentSoft = NSColor.systemBlue
+    static let accentSoft = NSColor.controlAccentColor
     static let warning = NSColor.systemOrange
     static let success = NSColor.systemGreen
     static let danger = NSColor.systemRed
     static let textPrimary = NSColor.labelColor
     static let textSecondary = NSColor.secondaryLabelColor
     static let textMuted = NSColor.tertiaryLabelColor
-    static let settingsBackground = NSColor(calibratedRed: 0.090, green: 0.098, blue: 0.118, alpha: 1)
-    static let settingsSidebar = NSColor(calibratedRed: 0.118, green: 0.126, blue: 0.150, alpha: 1)
-    static let settingsSurface = NSColor(calibratedRed: 0.145, green: 0.153, blue: 0.180, alpha: 1)
-    static let settingsSurfaceRaised = NSColor(calibratedRed: 0.172, green: 0.184, blue: 0.216, alpha: 1)
-    static let settingsBorder = NSColor.white.withAlphaComponent(0.08)
-    static let settingsSeparator = NSColor.white.withAlphaComponent(0.07)
-    static let settingsTextPrimary = NSColor(calibratedWhite: 0.94, alpha: 1)
-    static let settingsTextSecondary = NSColor(calibratedWhite: 0.70, alpha: 1)
-    static let settingsTextMuted = NSColor(calibratedWhite: 0.50, alpha: 1)
+    static let settingsBackground = NSColor.clear
+    static let settingsSidebar = NSColor.clear
+    static let settingsSurface = NSColor.labelColor.withAlphaComponent(0.045)
+    static let settingsSurfaceRaised = NSColor.controlBackgroundColor
+    static let settingsBorder = NSColor.separatorColor
+    static let settingsSeparator = NSColor.separatorColor
+    static let progressTrack = NSColor.labelColor.withAlphaComponent(0.12)
+    static let settingsTextPrimary = NSColor.labelColor
+    static let settingsTextSecondary = NSColor.secondaryLabelColor
+    static let settingsTextMuted = NSColor.secondaryLabelColor
 
     static func styleWindow(_ window: NSWindow?, minSize: NSSize? = nil) {
         guard let window else { return }
@@ -35,12 +36,12 @@ enum AppTheme {
 
     static func styleSettingsWindow(_ window: NSWindow?, minSize: NSSize? = nil) {
         guard let window else { return }
-        window.appearance = NSAppearance(named: .darkAqua)
+        window.appearance = nil
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .visible
         window.isMovableByWindowBackground = true
         window.backgroundColor = settingsBackground
-        window.isOpaque = true
+        window.isOpaque = false
         window.hasShadow = true
         if let minSize {
             window.minSize = minSize
@@ -49,13 +50,13 @@ enum AppTheme {
 
     static func styleUtilityWindow(_ window: NSWindow?, minSize: NSSize? = nil) {
         guard let window else { return }
-        window.appearance = NSAppearance(named: .darkAqua)
+        window.appearance = nil
         window.styleMask.insert(.fullSizeContentView)
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isMovableByWindowBackground = true
         window.backgroundColor = settingsBackground
-        window.isOpaque = true
+        window.isOpaque = false
         window.hasShadow = true
         if let minSize {
             window.minSize = minSize
@@ -71,9 +72,10 @@ enum AppTheme {
     }
 
     static func makeSettingsBackground() -> NSView {
-        let view = NSView()
-        view.wantsLayer = true
-        view.layer?.backgroundColor = settingsBackground.cgColor
+        let view = NSVisualEffectView()
+        view.material = .sidebar
+        view.blendingMode = .behindWindow
+        view.state = .followsWindowActiveState
         return view
     }
 
@@ -81,8 +83,7 @@ enum AppTheme {
         view.wantsLayer = true
         view.layer?.cornerRadius = cornerRadius
         view.layer?.backgroundColor = settingsSurface.cgColor
-        view.layer?.borderWidth = 1
-        view.layer?.borderColor = settingsBorder.cgColor
+        view.layer?.borderWidth = 0
     }
 
     static func stylePrimaryButton(_ button: NSButton) {

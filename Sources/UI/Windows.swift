@@ -221,7 +221,7 @@ struct SpeedTestView: View {
         .padding(.horizontal, 22)
         .padding(.bottom, 18)
         .frame(minWidth: 640, idealWidth: 640, maxWidth: .infinity, minHeight: 320, idealHeight: 320, maxHeight: .infinity)
-        .background(DPISettingsTokens.background)
+        .background(SettingsMaterialBackground().ignoresSafeArea())
         .alert(L10n.shared.speedTestFailed, isPresented: showingError) {
             Button(L10n.shared.ok) {
                 model.errorMessage = nil
@@ -262,7 +262,7 @@ struct SpeedMetricTile: View {
         .padding(14)
         .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112, alignment: .topLeading)
         .background(RoundedRectangle(cornerRadius: 8).fill(DPISettingsTokens.surface))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(DPISettingsTokens.border, lineWidth: 1))
+
     }
 }
 
@@ -376,7 +376,6 @@ struct LogsView: View {
                         .id("log-end")
                 }
                 .background(RoundedRectangle(cornerRadius: 8).fill(DPISettingsTokens.surface))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(DPISettingsTokens.border, lineWidth: 1))
                 .onChange(of: model.text) { _ in
                     proxy.scrollTo("log-end", anchor: .bottom)
                 }
@@ -386,7 +385,7 @@ struct LogsView: View {
         .padding(.horizontal, 22)
         .padding(.bottom, 18)
         .frame(minWidth: 700, minHeight: 460)
-        .background(DPISettingsTokens.background)
+        .background(SettingsMaterialBackground().ignoresSafeArea())
     }
 }
 
@@ -489,7 +488,7 @@ final class HelpWindowController: NSWindowController {
         guard let path = Bundle.main.path(forResource: "README", ofType: "md"),
               let content = try? String(contentsOfFile: path, encoding: .utf8) else {
             webView.loadHTMLString(
-                "<html><body style=\"margin:0;padding:28px;font:15px -apple-system;color:#f0f0f0;background:#17191e;\">\(L10n.shared.helpUnavailable)</body></html>",
+                "<html><body style=\"margin:0;padding:28px;font:15px -apple-system;color:CanvasText;background:transparent;color-scheme:light dark;\">\(L10n.shared.helpUnavailable)</body></html>",
                 baseURL: nil
             )
             return
@@ -500,21 +499,21 @@ final class HelpWindowController: NSWindowController {
         <html>
         <head>
         <style>
-        :root { color-scheme: dark; }
+        :root { color-scheme: light dark; --group: color-mix(in srgb, CanvasText 5%, transparent); --separator: color-mix(in srgb, CanvasText 10%, transparent); }
         * { box-sizing: border-box; }
-        html { background: #25272f; }
-        body { max-width: 760px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 14px; line-height: 1.58; padding: 22px 26px 34px; color: #f0f0f0; background: #25272f; }
-        a { color: #6aa7ff; }
-        h1, h2, h3 { color: #f0f0f0; }
-        h1 { font-size: 21px; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+        html { background: transparent; }
+        body { max-width: 760px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 14px; line-height: 1.58; padding: 22px 26px 34px; color: CanvasText; background: transparent; }
+        a { color: LinkText; }
+        h1, h2, h3 { color: CanvasText; }
+        h1 { font-size: 21px; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--separator); }
         h2 { font-size: 16px; margin: 24px 0 8px; }
         h3 { font-size: 14px; margin: 18px 0 6px; }
         p { margin: 8px 0; }
-        pre { background: #2c2f37; padding: 12px; border-radius: 8px; overflow-x: auto; border: 1px solid rgba(255,255,255,0.08); }
-        code { background: #2c2f37; padding: 2px 5px; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
-        img { max-width: 100%; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); }
+        pre { background: var(--group); padding: 12px; border-radius: 8px; overflow-x: auto; border: 1px solid var(--separator); }
+        code { background: var(--group); padding: 2px 5px; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+        img { max-width: 100%; border-radius: 8px; border: 1px solid var(--separator); }
         li { margin: 5px 0 5px 18px; }
-        hr { border: none; height: 1px; background: rgba(255,255,255,0.08); }
+        hr { border: none; height: 1px; background: var(--separator); }
         </style>
         </head>
         <body>\(html)</body>
@@ -605,7 +604,7 @@ final class LoadingWindowController: NSWindowController {
         window.center()
         window.isMovableByWindowBackground = true
         window.level = .floating
-        window.appearance = NSAppearance(named: .darkAqua)
+        window.appearance = nil
         window.backgroundColor = .clear
         window.isOpaque = false
         window.hasShadow = true
@@ -735,7 +734,7 @@ final class LoadingWindowController: NSWindowController {
     }
 }
 
-final class LoaderBackgroundView: NSView {
+final class LoaderBackgroundView: NSVisualEffectView {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         commonInit()
@@ -747,12 +746,12 @@ final class LoaderBackgroundView: NSView {
     }
 
     private func commonInit() {
+        material = .hudWindow
+        blendingMode = .behindWindow
+        state = .active
         wantsLayer = true
         layer?.cornerRadius = 18
         layer?.masksToBounds = true
-        layer?.backgroundColor = AppTheme.settingsSurfaceRaised.cgColor
-        layer?.borderWidth = 1
-        layer?.borderColor = AppTheme.settingsBorder.cgColor
     }
 }
 
@@ -777,7 +776,7 @@ final class LoaderProgressView: NSView {
         layer?.addSublayer(trackLayer)
         layer?.addSublayer(fillLayer)
 
-        trackLayer.backgroundColor = NSColor.white.withAlphaComponent(0.12).cgColor
+        trackLayer.backgroundColor = AppTheme.progressTrack.cgColor
         fillLayer.colors = [
             NSColor.controlAccentColor.withAlphaComponent(0.95).cgColor,
             AppTheme.accentSoft.withAlphaComponent(0.88).cgColor

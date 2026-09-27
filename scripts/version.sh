@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-DPIKILLER_VERSION_PREFIX="${DPIKILLER_VERSION_PREFIX:-3.0}"
+DPIKILLER_VERSION_PREFIX="${DPIKILLER_VERSION_PREFIX:-4.0}"
 
 plist_get() {
     local plist=$1
@@ -118,6 +118,11 @@ next_release_version() {
     latest_tag="$(latest_dpikiller_tag_version)"
     base="$(max_dpikiller_version "$current" "${latest_tag:-}")"
 
+    if [ -z "$latest_tag" ]; then
+        echo "$current"
+        return
+    fi
+
     if [ -n "$latest_tag" ] &&
         [ "$(max_dpikiller_version "$current" "$latest_tag")" = "$current" ] &&
         [[ "$(version_sort_key "$current")" > "$(version_sort_key "$latest_tag")" ]]; then
@@ -161,7 +166,7 @@ resolve_dpikiller_version() {
         version="$(current_source_version "$plist")"
     fi
 
-    build_num="$(version_patch "$version")"
+    build_num="$version"
 
     plist_set "Info.plist" "CFBundleShortVersionString" "$version"
     plist_set "Info.plist" "CFBundleVersion" "$build_num"

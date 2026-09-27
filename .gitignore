@@ -6,6 +6,7 @@
 # Build items
 /SpoofController.app/
 /SpoofController
+/DPIKiller.app/
 
 # Swift Package Manager
 /.build/
