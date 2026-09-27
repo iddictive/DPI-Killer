@@ -595,7 +595,7 @@ final class DPIKillerManager {
                     completion(true)
                     return
                 }
-                Thread.sleep(forTimeInterval: 0.2)
+                Thread.sleep(forTimeInterval: 0.05)
             }
             completion(false)
         }
@@ -715,7 +715,7 @@ final class DPIKillerManager {
             case .ready:
                 reachable = true
                 semaphore.signal()
-            case .failed(_), .cancelled:
+            case .waiting(_), .failed(_), .cancelled:
                 semaphore.signal()
             default:
                 break
