@@ -183,28 +183,23 @@ struct SettingsRow<Content: View>: View {
     }
 
     var body: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 3) {
-            GridRow {
-                Text(label)
-                    .font(DPISettingsTokens.labelFont)
-                    .foregroundStyle(DPISettingsTokens.secondaryText)
-                    .frame(width: DPISettingsTokens.rowLabelWidth, alignment: .leading)
+        HStack(alignment: .top, spacing: 12) {
+            Text(label)
+                .font(DPISettingsTokens.labelFont)
+                .foregroundStyle(DPISettingsTokens.secondaryText)
+                .frame(width: DPISettingsTokens.rowLabelWidth, alignment: .leading)
+                .padding(.top, 4)
 
+            VStack(alignment: .leading, spacing: 3) {
                 content
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            if let help, !help.isEmpty {
-                GridRow {
-                    Color.clear
-                        .frame(width: DPISettingsTokens.rowLabelWidth, height: 0)
-
+                if let help, !help.isEmpty {
                     Text(help)
                         .font(DPISettingsTokens.captionFont)
                         .foregroundStyle(DPISettingsTokens.mutedText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -262,6 +257,13 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            Text(L10n.shared.settingsTitle)
+                .font(DPISettingsTokens.titleFont)
+                .foregroundStyle(DPISettingsTokens.secondaryText)
+                .frame(maxWidth: .infinity)
+                .frame(height: 32)
+                .accessibilityAddTraits(.isHeader)
+
             HStack(spacing: 0) {
                 SettingsSidebar(selectedTab: $viewModel.selectedTab)
 
@@ -291,6 +293,7 @@ struct SettingsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(SettingsMaterialBackground().ignoresSafeArea())
+        .ignoresSafeArea(.container, edges: .top)
         .onAppear {
             viewModel.refreshRuntimeStatus()
             viewModel.refreshEngineVersionsIfNeeded()
@@ -304,9 +307,7 @@ struct SettingsView: View {
             backendTab
         case .network:
             networkTab
-        case .bypass:
             bypassTab
-        case .dns:
             dnsTab
         case .app:
             appTab
@@ -361,7 +362,7 @@ struct SettingsView: View {
 
     private var networkTab: some View {
         SettingsCard(
-            title: L10n.shared.sectionNetwork
+            title: text(ru: "Подключение", en: "Connection")
         ) {
             SettingsRow(L10n.shared.portTitle, help: L10n.shared.tipLocalPort) {
                 TextField(L10n.shared.portPlaceholder, text: $viewModel.localPort)
@@ -383,18 +384,19 @@ struct SettingsView: View {
                         ProgressView()
                             .controlSize(.small)
                     }
+                    Button(action: viewModel.refreshRuntimeStatus) {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.borderless)
+                    .help(L10n.shared.refreshStatus)
+                    .accessibilityLabel(L10n.shared.refreshStatus)
+                    .disabled(viewModel.isApplyingNetworkOptimization)
                 }
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Button(L10n.shared.mobilePresetTitle) {
+            SettingsRow("") {
+                Button(text(ru: "Оптимизировать для точки доступа", en: "Optimize for hotspot")) {
                     viewModel.applyMobilePreset()
-                }
-                .buttonStyle(.bordered)
-                .disabled(viewModel.isApplyingNetworkOptimization)
-
-                Button(L10n.shared.refreshStatus) {
-                    viewModel.refreshRuntimeStatus()
                 }
                 .buttonStyle(.bordered)
                 .disabled(viewModel.isApplyingNetworkOptimization)
@@ -414,7 +416,7 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(maxWidth: 330)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .onChange(of: viewModel.selectedPreset) { preset in
                     viewModel.applyPreset(preset)
                 }
@@ -422,12 +424,15 @@ struct SettingsView: View {
 
             Divider()
             ForEach(viewModel.options.filter { viewModel.flagSupported($0.flag) }) { option in
-                Toggle(viewModel.optionTitle(option.flag), isOn: Binding(
-                    get: { viewModel.flagEnabled(option.flag) },
-                    set: { viewModel.setFlag(option.flag, enabled: $0) }
-                ))
-                .toggleStyle(.checkbox)
-                .help(option.description)
+                SettingsRow(viewModel.optionTitle(option.flag)) {
+                    Toggle(viewModel.optionTitle(option.flag), isOn: Binding(
+                        get: { viewModel.flagEnabled(option.flag) },
+                        set: { viewModel.setFlag(option.flag, enabled: $0) }
+                    ))
+                    .labelsHidden()
+                    .toggleStyle(.checkbox)
+                    .help(option.description)
+                }
             }
             Divider()
 
@@ -444,7 +449,8 @@ struct SettingsView: View {
                     }
                 }
                 .labelsHidden()
-                .frame(width: 160)
+                .fixedSize()
+                .frame(minWidth: 160, alignment: .leading)
             }
 
             SettingsRow(L10n.shared.httpsDisorder) {
@@ -453,7 +459,11 @@ struct SettingsView: View {
                     .labelsHidden()
             }
 
-            SettingsRow(L10n.shared.httpsFakeCount, help: L10n.shared.tipFakeCount) {
+            SettingsRow(
+                viewModel.resolvedEngine == .ciadpi
+                    ? text(ru: "Ложные пакеты", en: "Fake packets") : L10n.shared.httpsFakeCount,
+                help: viewModel.resolvedEngine == .ciadpi ? nil : L10n.shared.tipFakeCount
+            ) {
                 if viewModel.resolvedEngine == .ciadpi {
                     Toggle("", isOn: Binding(
                         get: { viewModel.ciadpiFakeEnabled },
@@ -481,39 +491,38 @@ struct SettingsView: View {
 
     private var dnsTab: some View {
         SettingsCard(
-            title: L10n.shared.sectionDNS,
-            subtitle: text(ru: "DNS resolver и DoH для SpoofDPI.", en: "DNS resolver and DoH for SpoofDPI.")
+            title: L10n.shared.sectionDNS
         ) {
             if !viewModel.dnsAvailable {
                 Text(L10n.shared.dnsDisabledForCiadpi)
                     .font(DPISettingsTokens.captionFont)
-                    .foregroundStyle(DPISettingsTokens.warning)
-            }
-
-            SettingsRow(L10n.shared.dnsAddrTitle, help: L10n.shared.tipDNSAddr) {
-                TextField("8.8.8.8:53", text: $viewModel.dnsAddr)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(!viewModel.dnsAvailable)
-            }
-
-            SettingsRow(L10n.shared.dnsModeTitle, help: L10n.shared.tipDNSSystem) {
-                Picker("", selection: $viewModel.dnsMode) {
-                    ForEach(viewModel.dnsModes, id: \.self) { mode in
-                        Text(mode).tag(mode)
-                    }
+                    .foregroundStyle(DPISettingsTokens.secondaryText)
+            } else {
+                SettingsRow(L10n.shared.dnsAddrTitle, help: L10n.shared.tipDNSAddr) {
+                    TextField("8.8.8.8:53", text: $viewModel.dnsAddr)
+                        .textFieldStyle(.roundedBorder)
+                        .disabled(!viewModel.dnsAvailable)
                 }
-                .labelsHidden()
-                .disabled(!viewModel.dnsAvailable)
-                .frame(width: 160)
-            }
 
-            SettingsRow(L10n.shared.dnsHttpsTitle) {
-                TextField("https://dns.google/dns-query", text: $viewModel.dnsHttpsUrl)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(!viewModel.dnsAvailable || viewModel.dnsMode != "https")
+                SettingsRow(L10n.shared.dnsModeTitle, help: L10n.shared.tipDNSSystem) {
+                    Picker("", selection: $viewModel.dnsMode) {
+                        ForEach(viewModel.dnsModes, id: \.self) { mode in
+                            Text(mode).tag(mode)
+                        }
+                    }
+                    .labelsHidden()
+                    .disabled(!viewModel.dnsAvailable)
+                    .fixedSize()
+                    .frame(minWidth: 160, alignment: .leading)
+                }
+
+                SettingsRow(L10n.shared.dnsHttpsTitle) {
+                    TextField("https://dns.google/dns-query", text: $viewModel.dnsHttpsUrl)
+                        .textFieldStyle(.roundedBorder)
+                        .disabled(!viewModel.dnsAvailable || viewModel.dnsMode != "https")
+                }
             }
         }
-        .opacity(viewModel.dnsAvailable ? 1 : 0.72)
     }
 
     private var appTab: some View {

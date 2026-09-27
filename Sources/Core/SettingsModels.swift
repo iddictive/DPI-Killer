@@ -3,8 +3,6 @@ import Foundation
 enum SettingsTab: String, CaseIterable, Identifiable {
     case backend
     case network
-    case bypass
-    case dns
     case app
     case manual
 
@@ -16,10 +14,6 @@ enum SettingsTab: String, CaseIterable, Identifiable {
             return L10n.shared.sectionBackend
         case .network:
             return L10n.shared.sectionNetwork
-        case .bypass:
-            return L10n.shared.sectionDPI
-        case .dns:
-            return L10n.shared.sectionDNS
         case .app:
             return L10n.shared.sectionApp
         case .manual:
@@ -33,10 +27,6 @@ enum SettingsTab: String, CaseIterable, Identifiable {
             return "terminal"
         case .network:
             return "network"
-        case .bypass:
-            return "shield.lefthalf.filled"
-        case .dns:
-            return "globe"
         case .app:
             return "gearshape"
         case .manual:

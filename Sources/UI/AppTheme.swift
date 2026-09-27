@@ -39,7 +39,7 @@ enum AppTheme {
         window.appearance = nil
         window.styleMask.insert(.fullSizeContentView)
         window.titlebarAppearsTransparent = true
-        window.titleVisibility = .visible
+        window.titleVisibility = .hidden
         window.isMovableByWindowBackground = true
         window.backgroundColor = settingsBackground
         window.isOpaque = false
