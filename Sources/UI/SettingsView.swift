@@ -130,11 +130,13 @@ enum DPISettingsAssets {
 struct SettingsCard<Content: View>: View {
     let title: String
     let subtitle: String?
+    let showsSurface: Bool
     @ViewBuilder let content: Content
 
-    init(title: String, subtitle: String? = nil, @ViewBuilder content: () -> Content) {
+    init(title: String, subtitle: String? = nil, showsSurface: Bool = true, @ViewBuilder content: () -> Content) {
         self.title = title
         self.subtitle = subtitle
+        self.showsSurface = showsSurface
         self.content = content()
     }
 
@@ -156,9 +158,14 @@ struct SettingsCard<Content: View>: View {
             VStack(alignment: .leading, spacing: DPISettingsTokens.rowSpacing) {
                 content
             }
-            .padding(DPISettingsTokens.cardPadding)
+            .padding(showsSurface ? DPISettingsTokens.cardPadding : 0)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: DPISettingsTokens.cornerRadius).fill(DPISettingsTokens.surface))
+            .background {
+                if showsSurface {
+                    RoundedRectangle(cornerRadius: DPISettingsTokens.cornerRadius)
+                        .fill(DPISettingsTokens.surface)
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -181,7 +188,7 @@ struct SettingsRow<Content: View>: View {
                 Text(label)
                     .font(DPISettingsTokens.labelFont)
                     .foregroundStyle(DPISettingsTokens.secondaryText)
-                    .frame(width: DPISettingsTokens.rowLabelWidth, alignment: .trailing)
+                    .frame(width: DPISettingsTokens.rowLabelWidth, alignment: .leading)
 
                 content
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -286,8 +293,7 @@ struct SettingsView: View {
         .background(SettingsMaterialBackground().ignoresSafeArea())
         .onAppear {
             viewModel.refreshRuntimeStatus()
-            viewModel.refreshCiadpiLocalStatus()
-            viewModel.refreshSpoofdpiLocalStatus()
+            viewModel.refreshEngineVersionsIfNeeded()
         }
     }
 
@@ -314,15 +320,14 @@ struct SettingsView: View {
             SettingsCard(
                 title: L10n.shared.sectionCore
             ) {
-                SettingsRow(L10n.shared.backendModeTitle) {
-                    Picker("", selection: $viewModel.backendSelection) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Picker(L10n.shared.backendModeTitle, selection: $viewModel.backendSelection) {
                         ForEach(viewModel.backendSelections, id: \.self) { selection in
                             Text(viewModel.title(for: selection)).tag(selection)
                         }
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
-                    .frame(maxWidth: 360)
                     .onChange(of: viewModel.backendSelection) { _ in
                         viewModel.backendSelectionChanged()
                     }
@@ -339,12 +344,10 @@ struct SettingsView: View {
                         .font(DPISettingsTokens.captionFont)
                         .foregroundStyle(DPISettingsTokens.warning)
                 }
-                DisclosureGroup(text(ru: "Подробности", en: "Details")) {
-                    pathText(viewModel.resolvedBinaryPath)
-                    Text(viewModel.resolvedEngine.proxyDescription)
-                        .foregroundStyle(.secondary)
-                }
-                .font(DPISettingsTokens.captionFont)
+                pathText(viewModel.resolvedBinaryPath)
+                Text(viewModel.resolvedEngine.proxyDescription)
+                    .font(DPISettingsTokens.captionFont)
+                    .foregroundStyle(.secondary)
 
             }
 
@@ -485,7 +488,6 @@ struct SettingsView: View {
                 Text(L10n.shared.dnsDisabledForCiadpi)
                     .font(DPISettingsTokens.captionFont)
                     .foregroundStyle(DPISettingsTokens.warning)
-                    .padding(.leading, DPISettingsTokens.rowLabelWidth + 12)
             }
 
             SettingsRow(L10n.shared.dnsAddrTitle, help: L10n.shared.tipDNSAddr) {
@@ -531,15 +533,13 @@ struct SettingsView: View {
                     Text(viewModel.vpnClientCompatibilityStatus)
                         .font(DPISettingsTokens.captionFont)
                         .foregroundStyle(DPISettingsTokens.secondaryText)
-                        .padding(.leading, DPISettingsTokens.rowLabelWidth + 12)
-                }
+                    }
 
                 Button(viewModel.isConfiguringShadowrocket ? L10n.shared.configuringShadowrocket : L10n.shared.configureShadowrocket) {
                     viewModel.configureShadowrocket()
                 }
                 .buttonStyle(.bordered)
                 .disabled(viewModel.isConfiguringShadowrocket || viewModel.isApplyingNetworkOptimization)
-                .padding(.leading, DPISettingsTokens.rowLabelWidth + 12)
 
                 Toggle(isOn: $viewModel.vpnModeEnabled) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -554,7 +554,6 @@ struct SettingsView: View {
                 .toggleStyle(.checkbox)
                 .disabled(!viewModel.vpnAvailable || viewModel.vpnClientCompatibilityEnabled)
                 .opacity(viewModel.vpnAvailable && !viewModel.vpnClientCompatibilityEnabled ? 1 : 0.55)
-                .padding(.leading, 18)
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text(viewModel.vpnStatusTitle)
@@ -568,7 +567,6 @@ struct SettingsView: View {
                     .buttonStyle(.bordered)
                     .disabled(viewModel.isActivatingSystemExtension)
                 }
-                .padding(.leading, DPISettingsTokens.rowLabelWidth + 12)
             }
         }
     }
@@ -587,8 +585,7 @@ struct SettingsView: View {
     private var manualTab: some View {
         VStack(alignment: .leading, spacing: DPISettingsTokens.cardSpacing) {
             SettingsCard(
-                title: text(ru: "Manual ciadpi", en: "Manual ciadpi"),
-                subtitle: L10n.shared.manualArgsPlaceholderCiadpi
+                title: "ciadpi", showsSurface: false
             ) {
                 TextField(L10n.shared.manualArgsPlaceholderCiadpi, text: $viewModel.ciadpiManualArgs)
                     .textFieldStyle(.roundedBorder)
@@ -601,8 +598,7 @@ struct SettingsView: View {
             }
 
             SettingsCard(
-                title: text(ru: "Manual SpoofDPI", en: "Manual SpoofDPI"),
-                subtitle: L10n.shared.manualArgsPlaceholderSpoofdpi
+                title: "SpoofDPI", showsSurface: false
             ) {
                 TextField(L10n.shared.manualArgsPlaceholderSpoofdpi, text: $viewModel.spoofdpiManualArgs)
                     .textFieldStyle(.roundedBorder)
@@ -615,8 +611,7 @@ struct SettingsView: View {
             }
 
             SettingsCard(
-                title: text(ru: "Command Preview", en: "Command Preview"),
-                subtitle: text(ru: "Команда собирается из текущего draft-состояния.", en: "The command is built from the current draft state.")
+                title: text(ru: "Команда запуска", en: "Launch Command"), showsSurface: false
             ) {
                 ScrollView(.horizontal, showsIndicators: true) {
                     Text(viewModel.commandPreview)
@@ -657,28 +652,26 @@ struct SettingsView: View {
                 Text(version).font(DPISettingsTokens.captionFont).foregroundStyle(.secondary)
                 Spacer()
                 if busy { ProgressView().controlSize(.small) }
-                Button(text(ru: "Проверить", en: "Check"), action: check)
-                    .disabled(busy)
+                Button(action: check) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+                .help(text(ru: "Проверить обновления", en: "Check for updates"))
+                .accessibilityLabel(text(ru: "Проверить обновления \(name)", en: "Check for \(name) updates"))
+                .disabled(busy)
                 if canUpdate {
                     Button(text(ru: "Обновить", en: "Update"), action: update)
                         .disabled(busy)
                 }
             }
             .buttonStyle(.bordered)
-            if style != .neutral || busy {
-                Text(message)
-                    .font(DPISettingsTokens.captionFont)
-                    .foregroundStyle(style.color)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            DisclosureGroup(text(ru: "Подробности", en: "Details")) {
-                pathText(path)
-                if latest != L10n.shared.versionUnknown {
-                    Text(text(ru: "Последняя версия: \(latest)", en: "Latest version: \(latest)"))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .font(DPISettingsTokens.captionFont)
+            pathText(path)
+            Text(canUpdate
+                 ? text(ru: "Доступна версия \(latest)", en: "Version \(latest) available")
+                 : message)
+                .font(DPISettingsTokens.captionFont)
+                .foregroundStyle(style.color)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -709,7 +702,6 @@ struct SettingsView: View {
             }
         }
         .toggleStyle(.checkbox)
-        .padding(.leading, 18)
     }
 
     private func pathText(_ value: String) -> some View {
@@ -1260,7 +1252,17 @@ final class SettingsViewModel: ObservableObject {
         }
     }
 
+    private var lastAutomaticEngineCheck: Date?
+
+    func refreshEngineVersionsIfNeeded() {
+        guard lastAutomaticEngineCheck.map({ Date().timeIntervalSince($0) >= 300 }) ?? true else { return }
+        lastAutomaticEngineCheck = Date()
+        checkCiadpiVersion()
+        checkSpoofdpiVersion()
+    }
+
     func checkCiadpiVersion() {
+        guard !isCheckingCiadpi, !isUpdatingCiadpi else { return }
         isCheckingCiadpi = true
         ciadpiStatusMessage = text(ru: "Проверка ciadpi...", en: "Checking ciadpi...")
         ciadpiStatusStyle = .neutral
@@ -1285,6 +1287,7 @@ final class SettingsViewModel: ObservableObject {
     }
 
     func checkSpoofdpiVersion() {
+        guard !isCheckingSpoofdpi, !isUpdatingSpoofdpi else { return }
         isCheckingSpoofdpi = true
         spoofdpiStatusMessage = L10n.shared.spoofdpiChecking
         spoofdpiStatusStyle = .neutral

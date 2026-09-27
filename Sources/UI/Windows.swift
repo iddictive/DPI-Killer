@@ -53,6 +53,7 @@ final class SettingsWindowController: NSWindowController {
     override func showWindow(_ sender: Any?) {
         let shouldCenter = window?.isVisible != true
         model.refreshRuntimeStatus()
+        model.refreshEngineVersionsIfNeeded()
         super.showWindow(sender)
         enforceFixedWindowSize(center: shouldCenter)
         DispatchQueue.main.async { [weak self] in
