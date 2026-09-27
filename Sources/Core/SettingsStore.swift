@@ -34,6 +34,7 @@ final class SettingsStore {
     ]
     private let backendSelectionKey = "backendSelection"
     private let lastAppliedSystemProxyPortKey = "lastAppliedSystemProxyPort"
+    private let lastPromptedUpdateVersionKey = "lastPromptedUpdateVersion"
 
     var binaryPath: String {
         get {
@@ -138,6 +139,17 @@ final class SettingsStore {
                 defaults.set(newValue, forKey: lastAppliedSystemProxyPortKey)
             } else {
                 defaults.removeObject(forKey: lastAppliedSystemProxyPortKey)
+            }
+        }
+    }
+
+    var lastPromptedUpdateVersion: String? {
+        get { defaults.string(forKey: lastPromptedUpdateVersionKey) }
+        set {
+            if let newValue {
+                defaults.set(newValue, forKey: lastPromptedUpdateVersionKey)
+            } else {
+                defaults.removeObject(forKey: lastPromptedUpdateVersionKey)
             }
         }
     }
