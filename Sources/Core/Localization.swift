@@ -80,7 +80,7 @@ struct L10n {
     var descSilent: String { isRussian ? "Скрыть баннер при запуске" : "Suppress startup banner" }
     var descIpv4Only: String { isRussian ? "Только IPv4 для DNS" : "IPv4 only for DNS" }
     var descDebug: String { isRussian ? "Режим отладки (info/debug)" : "Debug mode (info/debug)" }
-    var descPolicyAuto: String { isRussian ? "Адаптивный обход для ciadpi" : "Adaptive bypass for ciadpi" }
+    var descPolicyAuto: String { isRussian ? "ciadpi применяет параметры обхода при тайм-ауте или сбросе соединения. В режиме random это уже включено автоматически." : "ciadpi applies bypass parameters after a connection timeout or reset. The random split mode already enables this automatically." }
 
     var dependencyMissing: String { isRussian ? "Нужен backend" : "Backend required" }
     var spoofDpiNeeded: String { isRussian ? "DPI Killer нужен локальный движок обхода. Установить поддерживаемые backend-движки для macOS?" : "DPI Killer needs a local bypass backend. Install the supported macOS backends?" }

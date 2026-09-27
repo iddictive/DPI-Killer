@@ -192,16 +192,11 @@ struct SettingsRow<Content: View>: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 content
-                if let help, !help.isEmpty {
-                    Text(help)
-                        .font(DPISettingsTokens.captionFont)
-                        .foregroundStyle(DPISettingsTokens.mutedText)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .help(help ?? "")
     }
 }
 
@@ -346,9 +341,6 @@ struct SettingsView: View {
                         .foregroundStyle(DPISettingsTokens.warning)
                 }
                 pathText(viewModel.resolvedBinaryPath)
-                Text(viewModel.resolvedEngine.proxyDescription)
-                    .font(DPISettingsTokens.captionFont)
-                    .foregroundStyle(.secondary)
 
             }
 
@@ -371,35 +363,28 @@ struct SettingsView: View {
             }
 
             SettingsRow(L10n.shared.runtimeModeTitle) {
-                HStack(spacing: 8) {
-                    SettingsBadge(title: viewModel.proxyModeTitle, style: .neutral)
-                    SettingsBadge(title: viewModel.runtimeStatusTitle, style: viewModel.runtimeBadgeStyle)
-                }
+                Text("\(viewModel.proxyModeTitle) · \(viewModel.runtimeStatusTitle)")
+                    .font(DPISettingsTokens.captionFont)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             SettingsRow(L10n.shared.hotspotStatusTitle) {
                 HStack(spacing: 8) {
-                    SettingsBadge(title: viewModel.networkOptimizationStatusTitle, style: viewModel.networkOptimizationBadgeStyle)
+                    Text(viewModel.networkOptimizationStatusTitle)
+                        .font(DPISettingsTokens.captionFont)
+                        .foregroundStyle(viewModel.networkOptimizationBadgeStyle.color)
+                    Spacer(minLength: 0)
                     if viewModel.isApplyingNetworkOptimization {
-                        ProgressView()
-                            .controlSize(.small)
+                        ProgressView().controlSize(.small)
+                    } else if viewModel.needsNetworkOptimization {
+                        Button(text(ru: "Оптимизировать", en: "Optimize")) {
+                            viewModel.applyMobilePreset()
+                        }
+                        .buttonStyle(.bordered)
+                        .help(text(ru: "Применить пресет Hotspot, сохранить настройки и оптимизировать сеть для мобильной точки доступа.", en: "Apply the Hotspot preset, save settings, and optimize the network for a mobile hotspot."))
                     }
-                    Button(action: viewModel.refreshRuntimeStatus) {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .buttonStyle(.borderless)
-                    .help(L10n.shared.refreshStatus)
-                    .accessibilityLabel(L10n.shared.refreshStatus)
-                    .disabled(viewModel.isApplyingNetworkOptimization)
                 }
-            }
-
-            SettingsRow("") {
-                Button(text(ru: "Оптимизировать для точки доступа", en: "Optimize for hotspot")) {
-                    viewModel.applyMobilePreset()
-                }
-                .buttonStyle(.bordered)
-                .disabled(viewModel.isApplyingNetworkOptimization)
             }
         }
     }
@@ -424,7 +409,7 @@ struct SettingsView: View {
 
             Divider()
             ForEach(viewModel.options.filter { viewModel.flagSupported($0.flag) }) { option in
-                SettingsRow(viewModel.optionTitle(option.flag)) {
+                SettingsRow(viewModel.optionTitle(option.flag), help: option.description) {
                     Toggle(viewModel.optionTitle(option.flag), isOn: Binding(
                         get: { viewModel.flagEnabled(option.flag) },
                         set: { viewModel.setFlag(option.flag, enabled: $0) }
@@ -453,7 +438,7 @@ struct SettingsView: View {
                 .frame(minWidth: 160, alignment: .leading)
             }
 
-            SettingsRow(L10n.shared.httpsDisorder) {
+            SettingsRow(L10n.shared.httpsDisorder, help: text(ru: "Отправлять фрагменты HTTPS в изменённом порядке для обхода DPI.", en: "Send HTTPS fragments out of order to bypass DPI.")) {
                 Toggle("", isOn: $viewModel.httpsDisorder)
                     .toggleStyle(.checkbox)
                     .labelsHidden()
@@ -462,7 +447,7 @@ struct SettingsView: View {
             SettingsRow(
                 viewModel.resolvedEngine == .ciadpi
                     ? text(ru: "Ложные пакеты", en: "Fake packets") : L10n.shared.httpsFakeCount,
-                help: viewModel.resolvedEngine == .ciadpi ? nil : L10n.shared.tipFakeCount
+                help: viewModel.resolvedEngine == .ciadpi ? text(ru: "Добавлять ложные пакеты для обхода DPI.", en: "Add fake packets to bypass DPI.") : L10n.shared.tipFakeCount
             ) {
                 if viewModel.resolvedEngine == .ciadpi {
                     Toggle("", isOn: Binding(
@@ -661,13 +646,20 @@ struct SettingsView: View {
                 Text(version).font(DPISettingsTokens.captionFont).foregroundStyle(.secondary)
                 Spacer()
                 if busy { ProgressView().controlSize(.small) }
-                Button(action: check) {
-                    Image(systemName: "arrow.clockwise")
+                Text(canUpdate
+                     ? text(ru: "Доступна \(latest)", en: "\(latest) available")
+                     : message)
+                    .font(DPISettingsTokens.captionFont)
+                    .foregroundStyle(style.color)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !busy && !canUpdate && style != .success {
+                    Button(action: check) {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.borderless)
+                    .help(text(ru: "Повторить проверку обновлений", en: "Retry checking for updates"))
+                    .accessibilityLabel(text(ru: "Проверить обновления \(name)", en: "Check for \(name) updates"))
                 }
-                .buttonStyle(.borderless)
-                .help(text(ru: "Проверить обновления", en: "Check for updates"))
-                .accessibilityLabel(text(ru: "Проверить обновления \(name)", en: "Check for \(name) updates"))
-                .disabled(busy)
                 if canUpdate {
                     Button(text(ru: "Обновить", en: "Update"), action: update)
                         .disabled(busy)
@@ -675,12 +667,6 @@ struct SettingsView: View {
             }
             .buttonStyle(.bordered)
             pathText(path)
-            Text(canUpdate
-                 ? text(ru: "Доступна версия \(latest)", en: "Version \(latest) available")
-                 : message)
-                .font(DPISettingsTokens.captionFont)
-                .foregroundStyle(style.color)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -711,15 +697,30 @@ struct SettingsView: View {
             }
         }
         .toggleStyle(.checkbox)
+        .help(help ?? "")
     }
 
     private func pathText(_ value: String) -> some View {
-        Text(value)
-            .font(.system(size: 12, weight: .regular, design: .monospaced))
-            .foregroundStyle(DPISettingsTokens.secondaryText)
-            .lineLimit(1)
-            .truncationMode(.middle)
-            .textSelection(.enabled)
+        let path = (value as NSString).expandingTildeInPath
+        return HStack(spacing: 8) {
+            Text(value)
+                .font(.system(size: 12, weight: .regular, design: .monospaced))
+                .foregroundStyle(DPISettingsTokens.secondaryText)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+                .help(path)
+            Spacer(minLength: 0)
+            Button {
+                NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+            } label: {
+                Image(systemName: "folder")
+            }
+            .buttonStyle(.borderless)
+            .help(text(ru: "Показать движок в Finder", en: "Show engine in Finder"))
+            .accessibilityLabel(text(ru: "Показать движок в Finder", en: "Show engine in Finder"))
+            .disabled(!FileManager.default.fileExists(atPath: path))
+        }
     }
 
     private func save() {
@@ -913,6 +914,8 @@ final class SettingsViewModel: ObservableObject {
     var runtimeBadgeStyle: SettingsBadgeStyle {
         vpnModeEnabled && !vpnAvailable ? .warning : .neutral
     }
+
+    var needsNetworkOptimization: Bool { !networkOptimizationApplied }
 
     var networkOptimizationStatusTitle: String {
         networkOptimizationApplied ? L10n.shared.networkOptimizationActive : L10n.shared.networkOptimizationInactive
