@@ -22,6 +22,7 @@ final class SettingsStore {
         "--split",
         "--disorder",
         "--fake",
+        "--fake-offset",
         "--ttl",
         "--tlsrec"
     ]
@@ -647,7 +648,7 @@ final class SettingsStore {
                 args += ["--disorder", "1"]
             }
             if fakeCount > 0 {
-                args += ["--fake", "-1", "--ttl", "8"]
+                args += ["--fake-offset", "-1", "--ttl", "8"]
             }
             return args + manualParts
         }
@@ -725,6 +726,7 @@ final class SettingsStore {
                 "--split",
                 "--disorder",
                 "--fake",
+                "--fake-offset",
                 "--ttl",
                 "--tlsrec",
                 "--policy-auto"

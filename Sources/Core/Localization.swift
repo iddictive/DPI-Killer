@@ -43,7 +43,7 @@ struct L10n {
     var argumentsTitle: String { isRussian ? "Аргументы (флаги):" : "Arguments (Flags):" }
     var manualArgsTitle: String { isRussian ? "Доп. аргументы:" : "Manual Arguments:" }
     var manualArgsPlaceholder: String { isRussian ? "-p 8080 -window-size 10" : "-p 8080 -window-size 10" }
-    var manualArgsPlaceholderCiadpi: String { isRussian ? "--fake -1 --ttl 8" : "--fake -1 --ttl 8" }
+    var manualArgsPlaceholderCiadpi: String { isRussian ? "--fake-offset -1 --ttl 8" : "--fake-offset -1 --ttl 8" }
     var manualArgsPlaceholderSpoofdpi: String { isRussian ? "--enable-doh" : "--enable-doh" }
     var autoLaunchTitle: String { isRussian ? "Автозагрузка:" : "Auto Launch:" }
     var launchAtLogin: String { isRussian ? "Запускать при старте системы" : "Launch at system startup" }

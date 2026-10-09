@@ -1530,7 +1530,7 @@ final class SettingsViewModel: ObservableObject {
                 args += ["--disorder", "1"]
             }
             if fakeCount > 0 {
-                args += ["--fake", "-1", "--ttl", "8"]
+                args += ["--fake-offset", "-1", "--ttl", "8"]
             }
             return args + manualParts
         }
