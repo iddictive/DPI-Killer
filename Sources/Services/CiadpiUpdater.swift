@@ -156,6 +156,9 @@ final class CiadpiUpdater {
         guard fileManager.isExecutableFile(atPath: binaryURL.path) else {
             throw CiadpiUpdateError.binaryMissing
         }
+        guard Self.smokeTestBinary(at: binaryURL.path) else {
+            throw CiadpiUpdateError.buildFailed
+        }
 
         let targetURL = URL(fileURLWithPath: SettingsStore.shared.managedCiadpiPath)
         let targetDir = targetURL.deletingLastPathComponent()
@@ -168,6 +171,26 @@ final class CiadpiUpdater {
         try? fileManager.removeItem(at: targetURL)
         try fileManager.moveItem(at: stagedURL, to: targetURL)
         clearQuarantine(at: targetURL)
+    }
+
+    /// Refuses to install a freshly built binary that cannot even print `--help`.
+    /// Keeps the last working managed binary instead of swapping in a broken one.
+    private static func smokeTestBinary(at path: String) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = ["--help"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard let output = String(data: data, encoding: .utf8) else { return false }
+            return output.contains("--split") || output.contains("--tlsrec")
+        } catch {
+            return false
+        }
     }
 
     private func version(at path: String) -> String? {

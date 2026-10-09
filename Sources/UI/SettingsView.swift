@@ -1530,7 +1530,12 @@ final class SettingsViewModel: ObservableObject {
                 args += ["--disorder", "1"]
             }
             if fakeCount > 0 {
-                args += ["--fake-offset", "-1", "--ttl", "8"]
+                if let fakeFlag = store.ciadpiFakeFlag(binaryPath: ciadpiResolvedPath) {
+                    args += [fakeFlag, "-1", "--ttl", "8"]
+                }
+            }
+            if let supported = store.ciadpiSupportedOptions(binaryPath: ciadpiResolvedPath) {
+                args = store.filteredCiadpiArgs(args, supported: supported)
             }
             return args + manualParts
         }

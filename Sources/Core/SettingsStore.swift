@@ -648,7 +648,12 @@ final class SettingsStore {
                 args += ["--disorder", "1"]
             }
             if fakeCount > 0 {
-                args += ["--fake-offset", "-1", "--ttl", "8"]
+                if let fakeFlag = ciadpiFakeFlag(binaryPath: explicitPath ?? binaryPath) {
+                    args += [fakeFlag, "-1", "--ttl", "8"]
+                }
+            }
+            if let supported = ciadpiSupportedOptions(binaryPath: explicitPath ?? binaryPath) {
+                args = filteredCiadpiArgs(args, supported: supported)
             }
             return args + manualParts
         }
@@ -797,6 +802,91 @@ final class SettingsStore {
 
     private var optionsFlags: Set<String> {
         ["--system-proxy", "--silent", "--dns-ipv4-only", "--debug", "--policy-auto", "--no-tui"]
+    }
+
+    private static var ciadpiHelpCache: [String: (mtime: Date?, output: String)] = [:]
+    private static let ciadpiHelpCacheLock = NSLock()
+
+    /// Long options supported by the installed ciadpi binary, parsed from `--help`.
+    /// Nil when the binary is missing or its help cannot be read; callers keep
+    /// generated args unfiltered in that case and let the normal launch path report.
+    func ciadpiSupportedOptions(binaryPath: String) -> Set<String>? {
+        guard let help = ciadpiHelpOutput(binaryPath: binaryPath) else { return nil }
+        var options = Set<String>()
+        var index = help.startIndex
+        while index < help.endIndex {
+            let dash = help[index] == "-"
+            let nextIsDash = help.index(after: index) < help.endIndex && help[help.index(after: index)] == "-"
+            guard dash, nextIsDash else {
+                index = help.index(after: index)
+                continue
+            }
+            var end = help.index(index, offsetBy: 2)
+            while end < help.endIndex, help[end].isLetter || help[end].isNumber || help[end] == "-" {
+                end = help.index(after: end)
+            }
+            options.insert(String(help[index..<end]))
+            index = end
+        }
+        return options
+    }
+
+    /// Fake-packet offset flag for the installed binary across the upstream
+    /// `--fake` → `--fake-offset` rename. Nil when neither exists; the caller
+    /// then omits fake packets and starts with degraded bypass instead of dying.
+    func ciadpiFakeFlag(binaryPath: String) -> String? {
+        guard let options = ciadpiSupportedOptions(binaryPath: binaryPath) else { return "--fake-offset" }
+        if options.contains("--fake-offset") { return "--fake-offset" }
+        if options.contains("--fake") { return "--fake" }
+        return nil
+    }
+
+    /// Drops generated ciadpi flags the installed binary no longer knows, with
+    /// their values. `-p`/`--def-ttl` are never dropped: without them nothing can
+    /// work, so a loud failure beats a silently misconfigured launch.
+    func filteredCiadpiArgs(_ args: [String], supported: Set<String>) -> [String] {
+        let droppable: Set<String> = ["--auto", "--split", "--tlsrec", "--disorder", "--fake", "--fake-offset", "--ttl"]
+        var filtered: [String] = []
+        var index = 0
+        while index < args.count {
+            let arg = args[index]
+            if droppable.contains(arg), !supported.contains(arg) {
+                index += 2
+                continue
+            }
+            filtered.append(arg)
+            index += 1
+        }
+        return filtered
+    }
+
+    private func ciadpiHelpOutput(binaryPath: String) -> String? {
+        guard FileManager.default.isExecutableFile(atPath: binaryPath) else { return nil }
+        let mtime = (try? FileManager.default.attributesOfItem(atPath: binaryPath))?[.modificationDate] as? Date
+        Self.ciadpiHelpCacheLock.lock()
+        let cached = Self.ciadpiHelpCache[binaryPath]
+        Self.ciadpiHelpCacheLock.unlock()
+        if let cached, cached.mtime == mtime {
+            return cached.output
+        }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: binaryPath)
+        process.arguments = ["--help"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard let output = String(data: data, encoding: .utf8), !output.isEmpty else { return nil }
+            Self.ciadpiHelpCacheLock.lock()
+            Self.ciadpiHelpCache[binaryPath] = (mtime, output)
+            Self.ciadpiHelpCacheLock.unlock()
+            return output
+        } catch {
+            return nil
+        }
     }
 
     private func spoofdpiSupportsHeadlessMode(binaryPath: String) -> Bool {
