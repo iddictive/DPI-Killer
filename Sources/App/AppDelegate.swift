@@ -495,7 +495,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func backendRuntimeTitle() -> String {
-        SettingsStore.shared.resolvedEngine.displayName
+        if SettingsStore.shared.backendSelection == .dual {
+            return "spoofdpi + ciadpi"
+        }
+        return SettingsStore.shared.resolvedEngine.displayName
     }
 
     private func alertParentWindow() -> NSWindow? {

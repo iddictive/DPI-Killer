@@ -35,6 +35,7 @@ final class SettingsStore {
     ]
     private let backendSelectionKey = "backendSelection"
     private let lastAppliedSystemProxyPortKey = "lastAppliedSystemProxyPort"
+    private let lastAppliedDualCiadpiPortKey = "lastAppliedDualCiadpiPort"
     private let lastPromptedUpdateVersionKey = "lastPromptedUpdateVersion"
 
     var binaryPath: String {
@@ -140,6 +141,21 @@ final class SettingsStore {
                 defaults.set(newValue, forKey: lastAppliedSystemProxyPortKey)
             } else {
                 defaults.removeObject(forKey: lastAppliedSystemProxyPortKey)
+            }
+        }
+    }
+
+    /// SOCKS (ciadpi) port applied by the latest dual-mode system-proxy setup.
+    var lastAppliedDualCiadpiPort: Int? {
+        get {
+            guard defaults.object(forKey: lastAppliedDualCiadpiPortKey) != nil else { return nil }
+            return defaults.integer(forKey: lastAppliedDualCiadpiPortKey)
+        }
+        set {
+            if let newValue {
+                defaults.set(newValue, forKey: lastAppliedDualCiadpiPortKey)
+            } else {
+                defaults.removeObject(forKey: lastAppliedDualCiadpiPortKey)
             }
         }
     }
@@ -443,10 +459,20 @@ final class SettingsStore {
             return detectedPath(for: .ciadpi) ?? managedCiadpiPath
         case .spoofdpi:
             return detectedPath(for: .spoofdpi) ?? "/opt/homebrew/bin/spoofdpi"
+        case .dual:
+            return detectedPath(for: .spoofdpi) ?? managedSpoofdpiPath
         case .custom:
             let trimmed = customPath?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             return trimmed.isEmpty ? binaryPath : trimmed
         }
+    }
+
+    /// Concrete binary paths for dual mode: spoofdpi serves HTTP(S), ciadpi serves SOCKS.
+    func dualBinaryPaths() -> [(engine: BypassEngine, path: String)] {
+        [
+            (.spoofdpi, detectedPath(for: .spoofdpi) ?? managedSpoofdpiPath),
+            (.ciadpi, detectedPath(for: .ciadpi) ?? managedCiadpiPath)
+        ]
     }
 
     var binaryPathWasUserSet: Bool {
@@ -468,7 +494,7 @@ final class SettingsStore {
         switch selection {
         case .automatic:
             saveDetectedBinaryPath(resolvedBinaryPath(for: selection))
-        case .ciadpi, .spoofdpi, .custom:
+        case .ciadpi, .spoofdpi, .custom, .dual:
             saveUserSelectedBinaryPath(resolvedBinaryPath(for: selection, customPath: customPath))
         }
     }

@@ -335,12 +335,23 @@ struct SettingsView: View {
                             .textFieldStyle(.roundedBorder)
                     }
                 }
-                if !FileManager.default.isExecutableFile(atPath: viewModel.resolvedBinaryPath) {
-                    Text(L10n.shared.backendMissingSuffix)
-                        .font(DPISettingsTokens.captionFont)
-                        .foregroundStyle(DPISettingsTokens.warning)
+                if viewModel.backendSelection == .dual {
+                    ForEach(viewModel.dualPaths, id: \.path) { item in
+                        if !FileManager.default.isExecutableFile(atPath: item.path) {
+                            Text(item.engine.displayName + " " + L10n.shared.backendMissingSuffix)
+                                .font(DPISettingsTokens.captionFont)
+                                .foregroundStyle(DPISettingsTokens.warning)
+                        }
+                        pathText(item.path)
+                    }
+                } else {
+                    if !FileManager.default.isExecutableFile(atPath: viewModel.resolvedBinaryPath) {
+                        Text(L10n.shared.backendMissingSuffix)
+                            .font(DPISettingsTokens.captionFont)
+                            .foregroundStyle(DPISettingsTokens.warning)
+                    }
+                    pathText(viewModel.resolvedBinaryPath)
                 }
-                pathText(viewModel.resolvedBinaryPath)
 
             }
 
@@ -792,8 +803,9 @@ final class SettingsViewModel: ObservableObject {
     @Published private var networkOptimizationApplied = false
     @Published private var backendRunning = false
     @Published private var runtimePort: Int?
+    @Published private var runtimeCiadpiPort: Int?
 
-    let backendSelections: [BackendSelection] = [.automatic, .ciadpi, .spoofdpi, .custom]
+    let backendSelections: [BackendSelection] = [.automatic, .ciadpi, .spoofdpi, .dual, .custom]
     let splitModes = ["sni", "random", "chunk", "none"]
     let dnsModes = ["udp", "https", "system"]
     let options: [SettingsArgumentOption] = [
@@ -853,6 +865,7 @@ final class SettingsViewModel: ObservableObject {
         networkOptimizationApplied = store.isNetworkOptimizationApplied()
         backendRunning = DPIKillerManager.shared.isRunning
         runtimePort = DPIKillerManager.shared.activePort
+        runtimeCiadpiPort = DPIKillerManager.shared.activeCiadpiPort
 
         refreshCiadpiLocalStatus()
         refreshSpoofdpiLocalStatus()
@@ -860,6 +873,14 @@ final class SettingsViewModel: ObservableObject {
 
     var resolvedBinaryPath: String {
         store.resolvedBinaryPath(for: backendSelection, customPath: customBinaryPath)
+    }
+
+    var isDualSelection: Bool {
+        backendSelection == .dual
+    }
+
+    var dualPaths: [(engine: BypassEngine, path: String)] {
+        store.dualBinaryPaths()
     }
 
     var resolvedEngine: BypassEngine {
@@ -871,11 +892,17 @@ final class SettingsViewModel: ObservableObject {
     }
 
     var dnsAvailable: Bool {
-        BackendCapability.forEngine(resolvedEngine).supportsDNS
+        if isDualSelection {
+            return true
+        }
+        return BackendCapability.forEngine(resolvedEngine).supportsDNS
     }
 
     var chunkSizeAvailable: Bool {
-        BackendCapability.forEngine(resolvedEngine).supportsChunkSize
+        if isDualSelection {
+            return true
+        }
+        return BackendCapability.forEngine(resolvedEngine).supportsChunkSize
     }
 
     var vpnAvailable: Bool {
@@ -883,6 +910,9 @@ final class SettingsViewModel: ObservableObject {
     }
 
     var backendSummary: String {
+        if isDualSelection {
+            return "spoofdpi + ciadpi • HTTP+SOCKS"
+        }
         let path = resolvedBinaryPath
         let pathState = FileManager.default.fileExists(atPath: path)
             ? URL(fileURLWithPath: path).lastPathComponent
@@ -897,10 +927,33 @@ final class SettingsViewModel: ObservableObject {
     }
 
     var proxyModeTitle: String {
-        "\(resolvedEngine.displayName) • \(resolvedEngine.proxyDescription)"
+        if isDualSelection {
+            return "spoofdpi + ciadpi • HTTP+SOCKS"
+        }
+        return resolvedEngine.displayName + " • " + resolvedEngine.proxyDescription
     }
 
     var runtimeStatusTitle: String {
+        if isDualSelection {
+            let spoofPort = runtimePort ?? DPIKillerManager.shared.proxyPort
+            let ciaPort = runtimeCiadpiPort ?? DPIKillerManager.shared.activeCiadpiPort
+            let portSuffix: String
+            if backendRunning, let ciaPort {
+                portSuffix = " • Ports \(spoofPort)/\(ciaPort)"
+            } else if backendRunning {
+                portSuffix = " • Port \(spoofPort)"
+            } else {
+                portSuffix = ""
+            }
+            if vpnClientCompatibilityEnabled {
+                return L10n.shared.runtimeModeLocalProxy + portSuffix
+            }
+            if vpnModeEnabled {
+                return (tunnelActive ? L10n.shared.runtimeModeVpn : L10n.shared.vpnStatusReady) + portSuffix
+            }
+            let proxyLabel = dualUsesSystemProxy ? L10n.shared.runtimeModeProxy : L10n.shared.runtimeModeLocalProxy
+            return proxyLabel + portSuffix
+        }
         let portSuffix = backendRunning ? " • Port \(runtimePort ?? DPIKillerManager.shared.proxyPort)" : ""
         if vpnClientCompatibilityEnabled {
             return L10n.shared.runtimeModeLocalProxy + portSuffix
@@ -1008,7 +1061,12 @@ final class SettingsViewModel: ObservableObject {
     }
 
     var commandPreview: String {
-        ([resolvedBinaryPath] + buildLaunchArguments()).map(shellQuoted).joined(separator: " ")
+        if isDualSelection {
+            return dualPaths.map { item in
+                ([item.path] + buildLaunchArguments(for: item.engine, binaryPath: item.path)).map(shellQuoted).joined(separator: " ")
+            }.joined(separator: "\n")
+        }
+        return ([resolvedBinaryPath] + buildLaunchArguments()).map(shellQuoted).joined(separator: " ")
     }
 
     var vpnClientCompatibilityStatus: String {
@@ -1036,6 +1094,8 @@ final class SettingsViewModel: ObservableObject {
             return L10n.shared.backendCiadpi
         case .spoofdpi:
             return L10n.shared.backendSpoofdpi
+        case .dual:
+            return L10n.shared.backendDual
         case .custom:
             return L10n.shared.backendCustom
         }
@@ -1069,12 +1129,31 @@ final class SettingsViewModel: ObservableObject {
         if flag == "--system-proxy", vpnClientCompatibilityEnabled {
             return false
         }
+        if isDualSelection {
+            return [.ciadpi, .spoofdpi].contains(where: { engine in
+                BackendCapability.forEngine(engine).supports(flag: flag)
+                    && selectedFlags(for: engine).contains(flag)
+            })
+        }
         return selectedFlags(for: resolvedEngine).contains(flag)
     }
 
     func setFlag(_ flag: String, enabled: Bool) {
         guard flagSupported(flag) else { return }
         guard !(flag == "--system-proxy" && vpnClientCompatibilityEnabled && enabled) else { return }
+        if isDualSelection {
+            for engine in [BypassEngine.ciadpi, BypassEngine.spoofdpi] {
+                guard BackendCapability.forEngine(engine).supports(flag: flag) else { continue }
+                var flags = selectedFlags(for: engine)
+                if enabled {
+                    flags.insert(flag)
+                } else {
+                    flags.remove(flag)
+                }
+                flagsByEngine[engine] = flags
+            }
+            return
+        }
         var flags = selectedFlags(for: resolvedEngine)
         if enabled {
             flags.insert(flag)
@@ -1087,6 +1166,10 @@ final class SettingsViewModel: ObservableObject {
     func flagSupported(_ flag: String) -> Bool {
         if flag == "--system-proxy", vpnClientCompatibilityEnabled {
             return false
+        }
+        if isDualSelection {
+            return BackendCapability.forEngine(.ciadpi).supports(flag: flag)
+                || BackendCapability.forEngine(.spoofdpi).supports(flag: flag)
         }
         return BackendCapability.forEngine(resolvedEngine).supports(flag: flag)
     }
@@ -1123,7 +1206,7 @@ final class SettingsViewModel: ObservableObject {
             defaultTTL = "65"
             splitMode = "random"
             httpsDisorder = true
-            httpsFakeCount = resolvedEngine == .ciadpi ? "1" : "0"
+            httpsFakeCount = (resolvedEngine == .ciadpi || isDualSelection) ? "1" : "0"
             httpsChunkSize = "20"
         case .conservative:
             defaultTTL = "128"
@@ -1454,6 +1537,11 @@ final class SettingsViewModel: ObservableObject {
         flagsByEngine[engine] ?? []
     }
 
+    private var dualUsesSystemProxy: Bool {
+        selectedFlags(for: .spoofdpi).contains("--system-proxy")
+            || selectedFlags(for: .ciadpi).contains("--system-proxy")
+    }
+
     private func manualArgs(for engine: BypassEngine) -> String {
         switch engine {
         case .ciadpi:
@@ -1464,7 +1552,10 @@ final class SettingsViewModel: ObservableObject {
     }
 
     private func buildLaunchArguments() -> [String] {
-        let engine = resolvedEngine
+        buildLaunchArguments(for: resolvedEngine, binaryPath: resolvedBinaryPath)
+    }
+
+    private func buildLaunchArguments(for engine: BypassEngine, binaryPath: String) -> [String] {
         let manualParts = argumentParts(from: manualArgs(for: engine))
         let flags = selectedFlags(for: engine).intersection(BackendCapability.forEngine(engine).supportedFlags)
         let port = clamp(localPort, defaultValue: 8080, range: 1...65535)
@@ -1475,7 +1566,7 @@ final class SettingsViewModel: ObservableObject {
         switch engine {
         case .spoofdpi:
             var args: [String] = []
-            if spoofdpiSupportsHeadlessMode(binaryPath: resolvedBinaryPath) {
+            if spoofdpiSupportsHeadlessMode(binaryPath: binaryPath) {
                 args.append("--no-tui")
             }
             if flags.contains("--silent") { args.append("--silent") }
@@ -1530,11 +1621,11 @@ final class SettingsViewModel: ObservableObject {
                 args += ["--disorder", "1"]
             }
             if fakeCount > 0 {
-                if let fakeFlag = store.ciadpiFakeFlag(binaryPath: ciadpiResolvedPath) {
+                if let fakeFlag = store.ciadpiFakeFlag(binaryPath: binaryPath) {
                     args += [fakeFlag, "-1", "--ttl", "8"]
                 }
             }
-            if let supported = store.ciadpiSupportedOptions(binaryPath: ciadpiResolvedPath) {
+            if let supported = store.ciadpiSupportedOptions(binaryPath: binaryPath) {
                 args = store.filteredCiadpiArgs(args, supported: supported)
             }
             return args + manualParts

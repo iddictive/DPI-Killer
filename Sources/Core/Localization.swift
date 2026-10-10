@@ -33,6 +33,7 @@ struct L10n {
     var backendAuto: String { isRussian ? "Авто" : "Auto" }
     var backendCiadpi: String { isRussian ? "ciadpi" : "ciadpi" }
     var backendSpoofdpi: String { isRussian ? "spoofdpi" : "spoofdpi" }
+    var backendDual: String { isRussian ? "Dual" : "Dual" }
     var backendCustom: String { isRussian ? "Custom" : "Custom" }
     var backendSummaryTitle: String { isRussian ? "Активный режим:" : "Resolved Mode:" }
     var backendPathHint: String { isRussian ? "Авто и фиксированные режимы сами подставляют путь. Ручное поле нужно только для custom." : "Auto and pinned modes resolve the path for you. Manual path is only needed for custom." }
@@ -96,6 +97,9 @@ struct L10n {
     var backendStartTimeout: String { isRussian ? "Backend не запустил локальный proxy вовремя." : "The backend did not start the local proxy in time." }
     var backendExitedEarly: String { isRussian ? "Backend остановился до готовности." : "The backend stopped before it was ready." }
     var gatewayMacHint: String { isRussian ? "SpoofDPI не смог получить MAC-адрес шлюза. Проверь VPN и сеть, затем попробуй ещё раз." : "SpoofDPI could not resolve the gateway MAC address. Check VPN and network, then retry." }
+    func dualMissingEngine(_ names: String) -> String {
+        isRussian ? "Dual-режим: не найдены движки: \(names). Установи оба и попробуй снова." : "Dual mode: missing engines: \(names). Install both and retry."
+    }
     func localPortInUse(_ port: Int) -> String {
         isRussian ? "Локальный порт \(port) уже занят другим процессом." : "Local port \(port) is already in use by another process."
     }

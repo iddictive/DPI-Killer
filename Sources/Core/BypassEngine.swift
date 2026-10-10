@@ -9,6 +9,7 @@ enum BackendSelection: String {
     case automatic
     case ciadpi
     case spoofdpi
+    case dual
     case custom
 }
 
