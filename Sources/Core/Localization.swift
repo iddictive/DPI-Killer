@@ -95,6 +95,7 @@ struct L10n {
     var installManual: String { isRussian ? "Неизвестная ошибка. Установите ciadpi вручную и скачайте SpoofDPI из официального GitHub release." : "Unknown error. Please install ciadpi manually and download SpoofDPI from the official GitHub release." }
     var backendStartTimeout: String { isRussian ? "Backend не запустил локальный proxy вовремя." : "The backend did not start the local proxy in time." }
     var backendExitedEarly: String { isRussian ? "Backend остановился до готовности." : "The backend stopped before it was ready." }
+    var gatewayMacHint: String { isRussian ? "SpoofDPI не смог получить MAC-адрес шлюза. Проверь VPN и сеть, затем попробуй ещё раз." : "SpoofDPI could not resolve the gateway MAC address. Check VPN and network, then retry." }
     func localPortInUse(_ port: Int) -> String {
         isRussian ? "Локальный порт \(port) уже занят другим процессом." : "Local port \(port) is already in use by another process."
     }

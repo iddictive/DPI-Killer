@@ -522,6 +522,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               !error.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return L10n.shared.startupFailureInfo
         }
+        let lowered = error.lowercased()
+        if lowered.contains("gateway mac") || lowered.contains("default route") {
+            return error + "\n\n" + L10n.shared.gatewayMacHint
+        }
         return error
     }
 

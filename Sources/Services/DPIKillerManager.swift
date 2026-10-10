@@ -25,6 +25,8 @@ final class DPIKillerManager {
     private var shouldRestoreAfterDisconnect = false
     private var isConnectivityRestartInProgress = false
     private(set) var activePort: Int?
+    private var didBecomeReady = false
+    private var internalRestartInProgress = false
 
     private var currentEngine: BypassEngine {
         SettingsStore.shared.currentEngine()
@@ -90,6 +92,7 @@ final class DPIKillerManager {
         }
         killOrphans()
         isRunning = false
+        didBecomeReady = false
         wasRunningBeforeDisconnect = true
         shouldRestoreAfterDisconnect = false
 
@@ -161,13 +164,12 @@ final class DPIKillerManager {
             DispatchQueue.main.async {
                 guard let self, let terminatedProcess = process else { return }
                 guard self.process === terminatedProcess || self.process == nil else { return }
-                self.outputPipe?.fileHandleForReading.readabilityHandler = nil
-                self.outputPipe = nil
-                self.isRunning = false
-                self.process = nil
-                self.activePort = nil
-                self.stopWatchdog()
+                let unexpected = self.wasRunningBeforeDisconnect && !self.internalRestartInProgress && self.didBecomeReady
+                self.resetBackendState()
                 (NSApp.delegate as? AppDelegate)?.refreshUI()
+                if unexpected {
+                    self.handleUnexpectedBackendExit()
+                }
             }
         }
 
@@ -229,6 +231,7 @@ final class DPIKillerManager {
 
                     self.isRunning = true
                     self.activePort = port
+                    self.didBecomeReady = true
                     if forceSystemProxy || (SettingsStore.shared.usesSystemProxy && !SettingsStore.shared.vpnModeEnabled) {
                         self.enableSystemProxy(for: engine, port: port)
                     }
@@ -276,6 +279,8 @@ final class DPIKillerManager {
 
     func stop() {
         isRunning = false
+        didBecomeReady = false
+        internalRestartInProgress = false
         forceSystemProxyOverride = false
         wasRunningBeforeDisconnect = false
         shouldRestoreAfterDisconnect = false
@@ -324,6 +329,7 @@ final class DPIKillerManager {
         timer.schedule(deadline: .now() + .seconds(Int(watchdogInterval)), repeating: .seconds(Int(watchdogInterval)))
         timer.setEventHandler { [weak self] in
             self?.checkCPU()
+            self?.checkServing()
         }
         timer.resume()
         watchdogTimer = timer
@@ -388,13 +394,16 @@ final class DPIKillerManager {
         lastRestartTime = Date()
         highCpuStrikes = 0
         stopWatchdog()
+        internalRestartInProgress = true
         process?.terminate()
         process = nil
         isRunning = false
         killOrphans()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            self?.start(forceSystemProxy: self?.forceSystemProxyOverride ?? false) { success, error in
+            guard let self, self.wasRunningBeforeDisconnect else { return }
+            self.start(forceSystemProxy: self.forceSystemProxyOverride) { success, error in
+                self.internalRestartInProgress = false
                 if success {
                     AppLogger.log("[Watchdog] Backend restarted successfully.")
                 } else {
@@ -409,6 +418,7 @@ final class DPIKillerManager {
         shouldRestoreAfterDisconnect = false
         highCpuStrikes = 0
         stopWatchdog()
+        internalRestartInProgress = true
         outputPipe?.fileHandleForReading.readabilityHandler = nil
         outputPipe = nil
         process?.terminate()
@@ -418,7 +428,62 @@ final class DPIKillerManager {
         disableSystemProxy()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            self?.start(forceSystemProxy: self?.forceSystemProxyOverride ?? false, completion: completion)
+            guard let self, self.wasRunningBeforeDisconnect else { return }
+            self.start(forceSystemProxy: self.forceSystemProxyOverride) { success, error in
+                self.internalRestartInProgress = false
+                completion(success, error)
+            }
+        }
+    }
+
+    private func resetBackendState() {
+        outputPipe?.fileHandleForReading.readabilityHandler = nil
+        outputPipe = nil
+        isRunning = false
+        process = nil
+        activePort = nil
+        didBecomeReady = false
+        stopWatchdog()
+    }
+
+    private func handleUnexpectedBackendExit() {
+        AppLogger.log("[Manager] Backend exited after serving. Marking stopped.")
+        disableSystemProxy()
+        (NSApp.delegate as? AppDelegate)?.refreshUI()
+        guard wasRunningBeforeDisconnect, SettingsStore.shared.autoReconnect else { return }
+        if let lastRestart = lastRestartTime, Date().timeIntervalSince(lastRestart) < restartCooldown {
+            AppLogger.log("[Manager] Restart cooldown active, not restarting dead backend.")
+            return
+        }
+        lastRestartTime = Date()
+        internalRestartInProgress = true
+        AppLogger.log("[Manager] Restarting dead backend...")
+        start(forceSystemProxy: forceSystemProxyOverride) { [weak self] success, error in
+            self?.internalRestartInProgress = false
+            if success {
+                AppLogger.log("[Manager] Dead backend restarted.")
+            } else {
+                AppLogger.log("[Manager] Dead backend restart failed: \(error ?? "unknown error")")
+            }
+            (NSApp.delegate as? AppDelegate)?.refreshUI()
+        }
+    }
+
+    private func checkServing() {
+        guard isRunning, didBecomeReady, let port = activePort else { return }
+        maintenanceQueue.async { [weak self] in
+            guard let self else { return }
+            let reachable = self.isLocalPortReachable(port: port)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.isRunning, self.didBecomeReady, self.activePort == port else { return }
+                let alive = self.process?.isRunning ?? false
+                guard !alive || !reachable else { return }
+                AppLogger.log("[Watchdog] Backend not serving (process alive: \(alive), port reachable: \(reachable)). Recycling...")
+                self.process?.terminate()
+                self.resetBackendState()
+                (NSApp.delegate as? AppDelegate)?.refreshUI()
+                self.handleUnexpectedBackendExit()
+            }
         }
     }
 
