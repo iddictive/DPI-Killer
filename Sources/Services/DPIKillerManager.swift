@@ -37,6 +37,7 @@ final class DPIKillerManager {
     private var dualReadyEngines: Set<BypassEngine> = []
     private var dualStartupOutput: [BypassEngine: [String]] = [:]
     private let dualOutputLock = NSLock()
+    private var dualRestarting: Set<BypassEngine> = []
 
     private var currentEngine: BypassEngine {
         SettingsStore.shared.currentEngine()
@@ -656,6 +657,7 @@ final class DPIKillerManager {
         dualPipes.removeAll()
         dualPorts.removeAll()
         dualReadyEngines.removeAll()
+        dualRestarting.removeAll()
     }
 
     private func appendDualOutput(engine: BypassEngine, text: String) {
@@ -782,11 +784,13 @@ final class DPIKillerManager {
         group.notify(queue: .main) { [weak self] in
             guard let self else { return }
             guard self.isDualMode else { return }
-            let allAlive = launched.allSatisfy { $0.process.isRunning }
-            let allReady = readiness[.spoofdpi] == true && readiness[.ciadpi] == true
-            guard allAlive, allReady else {
+            let live = launched.filter { item in
+                readiness[item.engine] == true && item.process.isRunning && self.dualProcesses[item.engine].map({ $0 === item.process }) ?? false
+            }.map { $0.engine }
+            guard live.count == launched.count else {
                 let output = self.dualStartupOutputText()
-                if self.shouldAttemptBPFRepairDual(output: output, attempted: attemptedBPFRepair) {
+                let nothingServes = self.dualProcesses.values.allSatisfy({ !$0.isRunning })
+                if nothingServes, self.shouldAttemptBPFRepairDual(output: output, attempted: attemptedBPFRepair) {
                     AppLogger.log("[Manager] Dual spoofdpi needs BPF access. Attempting environment repair...")
                     self.repairBPFAccess { repairSuccess, repairError in
                         guard repairSuccess else {
@@ -800,12 +804,34 @@ final class DPIKillerManager {
                     }
                     return
                 }
-                AppLogger.log("[Manager] Dual backend failed readiness.")
-                self.stopDualProcesses()
-                self.killOrphans()
-                self.isDualMode = false
-                self.disableSystemProxy()
-                completion(false, self.backendStartupFailureMessage(base: L10n.shared.backendStartTimeout, output: output))
+                for item in launched where !live.contains(item.engine) {
+                    let current = self.dualProcesses[item.engine]
+                    let isSame = current.map({ $0 === item.process }) ?? false
+                    let replacementWarming = !isSame && (current?.isRunning ?? false)
+                    if !replacementWarming {
+                        self.restartDualSibling(item.engine)
+                    }
+                }
+                let serving = [BypassEngine.spoofdpi, BypassEngine.ciadpi].filter({ self.dualProcesses[$0]?.isRunning ?? false })
+                guard !serving.isEmpty else {
+                    AppLogger.log("[Manager] Dual backend failed readiness.")
+                    self.stopDualProcesses()
+                    self.killOrphans()
+                    self.isDualMode = false
+                    self.disableSystemProxy()
+                    completion(false, self.backendStartupFailureMessage(base: L10n.shared.backendStartTimeout, output: output))
+                    (NSApp.delegate as? AppDelegate)?.refreshUI()
+                    return
+                }
+                AppLogger.log("[Manager] Dual degraded: serving with partial backends.")
+                self.isRunning = true
+                self.didBecomeReady = true
+                self.activePort = self.dualPorts[.spoofdpi]
+                self.activeCiadpiPort = self.dualPorts[.ciadpi]
+                self.dualReadyEngines = Set(serving)
+                self.reapplyDualProxyIfNeeded()
+                self.startWatchdog()
+                completion(true, nil)
                 (NSApp.delegate as? AppDelegate)?.refreshUI()
                 return
             }
@@ -858,6 +884,7 @@ final class DPIKillerManager {
             try process.run()
             dualProcesses[engine] = process
             dualPipes[engine] = pipe
+            dualPorts[engine] = port
             return process
         } catch {
             AppLogger.log("[Manager] Dual launch failed.")
@@ -895,6 +922,7 @@ final class DPIKillerManager {
             return
         }
         AppLogger.log("[Manager] Dual backend exited, sibling keeps serving.")
+        self.reapplyDualProxyIfNeeded()
         (NSApp.delegate as? AppDelegate)?.refreshUI()
         guard wasRunningBeforeDisconnect, !internalRestartInProgress, didBecomeReady else { return }
         restartDualSibling(engine)
@@ -902,38 +930,42 @@ final class DPIKillerManager {
 
     private func restartDualSibling(_ engine: BypassEngine) {
         guard SettingsStore.shared.autoReconnect else { return }
+        guard !dualRestarting.contains(engine) else { return }
         if let lastRestart = lastRestartTime, Date().timeIntervalSince(lastRestart) < restartCooldown {
             AppLogger.log("[Manager] Restart cooldown active, sibling not restarted.")
             return
         }
         lastRestartTime = Date()
-        internalRestartInProgress = true
+        dualRestarting.insert(engine)
         AppLogger.log("[Manager] Restarting dead dual backend.")
         let path = SettingsStore.shared.dualBinaryPaths().first(where: { $0.engine == engine })?.path ?? ""
         guard FileManager.default.isExecutableFile(atPath: path) else {
-            internalRestartInProgress = false
+            dualRestarting.remove(engine)
             return
         }
         let preferred = engine == .spoofdpi ? preferredLocalPort() : preferredLocalPort() + 1
         guard let port = availableLocalPortExcluding(preferredPort: preferred, excluding: Array(dualPorts.values)) else {
-            internalRestartInProgress = false
+            dualRestarting.remove(engine)
             AppLogger.log("[Manager] No free port for dual sibling restart.")
             return
         }
         guard let proc = launchDualBackend(engine: engine, binaryPath: path, port: port) else {
-            internalRestartInProgress = false
+            dualRestarting.remove(engine)
             return
         }
         waitForBackendReady(engine: engine, process: proc, port: port) { [weak self] ready in
             DispatchQueue.main.async {
                 guard let self else { return }
-                self.internalRestartInProgress = false
+                self.dualRestarting.remove(engine)
                 guard ready, proc.isRunning, self.isDualMode, self.dualProcesses[engine] === proc else {
                     AppLogger.log("[Manager] Restarted dual backend did not become ready.")
                     if self.dualProcesses[engine] === proc {
                         self.dualProcesses[engine] = nil
+                        self.dualPorts.removeValue(forKey: engine)
+                        self.dualReadyEngines.remove(engine)
                         proc.terminate()
                     }
+                    self.reapplyDualProxyIfNeeded()
                     (NSApp.delegate as? AppDelegate)?.refreshUI()
                     return
                 }
@@ -952,12 +984,19 @@ final class DPIKillerManager {
     }
 
     private func reapplyDualProxyIfNeeded() {
-        guard let spoofPort = dualPorts[.spoofdpi], let ciaPort = dualPorts[.ciadpi] else { return }
-        let spoofProxy = SettingsStore.shared.selectedFlags(for: .spoofdpi).contains("--system-proxy") && !SettingsStore.shared.vpnModeEnabled
-        let ciaProxy = SettingsStore.shared.selectedFlags(for: .ciadpi).contains("--system-proxy") && !SettingsStore.shared.vpnModeEnabled
-        if spoofProxy || ciaProxy {
-            enableDualSystemProxy(spoofPort: spoofPort, ciaPort: ciaPort, enableSpoof: spoofProxy, enableCia: ciaProxy)
-        }
+        let wantSpoof = SettingsStore.shared.selectedFlags(for: .spoofdpi).contains("--system-proxy") && !SettingsStore.shared.vpnModeEnabled
+        let wantCia = SettingsStore.shared.selectedFlags(for: .ciadpi).contains("--system-proxy") && !SettingsStore.shared.vpnModeEnabled
+        guard wantSpoof || wantCia else { return }
+        let spoofUp = wantSpoof && (dualProcesses[.spoofdpi]?.isRunning ?? false)
+        let ciaUp = wantCia && (dualProcesses[.ciadpi]?.isRunning ?? false)
+        enableDualSystemProxy(
+            spoofPort: dualPorts[.spoofdpi],
+            ciaPort: dualPorts[.ciadpi],
+            enableSpoof: spoofUp,
+            enableCia: ciaUp,
+            disableSpoof: wantSpoof && !spoofUp,
+            disableCia: wantCia && !ciaUp
+        )
     }
 
     private func proxyServiceNames() -> [String] {
@@ -990,19 +1029,24 @@ final class DPIKillerManager {
         task.waitUntilExit()
     }
 
-    private func enableDualSystemProxy(spoofPort: Int, ciaPort: Int, enableSpoof: Bool, enableCia: Bool) {
+    private func enableDualSystemProxy(spoofPort: Int?, ciaPort: Int?, enableSpoof: Bool, enableCia: Bool, disableSpoof: Bool = false, disableCia: Bool = false) {
         SettingsStore.shared.lastAppliedSystemProxyPort = enableSpoof ? spoofPort : nil
         SettingsStore.shared.lastAppliedDualCiadpiPort = enableCia ? ciaPort : nil
         for service in proxyServiceNames() {
-            if enableSpoof {
+            if enableSpoof, let spoofPort {
                 runNetworkSetup(["-setwebproxy", service, "127.0.0.1", String(spoofPort), "off"])
                 runNetworkSetup(["-setsecurewebproxy", service, "127.0.0.1", String(spoofPort), "off"])
                 runNetworkSetup(["-setwebproxystate", service, "on"])
                 runNetworkSetup(["-setsecurewebproxystate", service, "on"])
+            } else if disableSpoof {
+                runNetworkSetup(["-setwebproxystate", service, "off"])
+                runNetworkSetup(["-setsecurewebproxystate", service, "off"])
             }
-            if enableCia {
+            if enableCia, let ciaPort {
                 runNetworkSetup(["-setsocksfirewallproxy", service, "127.0.0.1", String(ciaPort), "off"])
                 runNetworkSetup(["-setsocksfirewallproxystate", service, "on"])
+            } else if disableCia {
+                runNetworkSetup(["-setsocksfirewallproxystate", service, "off"])
             }
         }
     }
