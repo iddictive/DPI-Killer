@@ -2,7 +2,7 @@
 # scripts/create_dmg.sh
 
 APP_NAME="DPIKiller"
-APP_BUNDLE="${APP_NAME}.app"
+APP_BUNDLE=".build.noindex/${APP_NAME}.app"
 DMG_NAME="${APP_NAME}.dmg"
 
 # Check if app exists

@@ -25,41 +25,40 @@ DPI Killer manages [ByeDPI](https://github.com/hufrea/byedpi) (`ciadpi`) and [Sp
 
 1. Download the DMG from [Releases](https://github.com/iddictive/DPI-Killer/releases/latest).
 2. Move `DPIKiller.app` to Applications and launch it.
-3. Choose a backend in Settings. If none is available, use the installation prompt or select an existing executable.
-4. Start the proxy from the menu bar. Check the active port before connecting another client.
+3. Choose ciadpi or SpoofDPI in Settings.
+4. Start the proxy explicitly from the menu bar. Check the active port before connecting another client.
 
 Requires macOS 13 or newer. Release packaging uses an ad-hoc signature and does not notarize the app. macOS may require first-launch confirmation.
 
 ## Features
 
-- Automatic backend selection, explicit ciadpi or SpoofDPI selection, and custom executable paths.
+- Explicit ciadpi or SpoofDPI selection. The app starts stopped, including when launched at login.
 - SOCKS5 through ciadpi or HTTP proxy through SpoofDPI.
 - Configurable local port, with a free loopback port selected when the requested port is busy.
 - Bypass presets and engine-specific packet and DNS settings.
 - Managed backend installation and updates from upstream GitHub projects.
 - Connectivity diagnostics, speed tests, event logs, and application update checks.
-- Optional launch at login, reconnection, hotspot optimization, and VPN-client compatibility.
+- Optional launch at login, reconnection, and a separate hotspot TTL 65 action.
 
 ## Proxy modes
 
 | Mode | What DPI Killer does | What you need |
 | --- | --- | --- |
-| System proxy | Runs the backend and configures macOS network services to use it | A working backend |
-| VPN-client compatibility | Exposes a local upstream proxy; the other client owns routing | A client configured for the displayed proxy type and runtime port |
-| Packet Tunnel | Routes through the bundled tunnel extension when available | A build with the extension and the required Network Extension signing and provisioning |
+| Local proxy (default) | Runs a loopback proxy without changing macOS proxy settings | A client configured for the displayed proxy type and runtime port |
+| System proxy (explicit) | Checks HTTPS through the backend, then configures the current network connection | An available connection without another active proxy |
 
-Ordinary proxy builds do not provide Packet Tunnel mode. If the required extension or entitlement is missing, the app uses proxy mode.
+The app restores the connection's prior proxy settings when stopped. If the backend fails its internet check, it stops before enabling the system proxy. A real packet-tunnel VPN is not provided by these modes.
 
-For Shadowrocket, enable VPN-client compatibility and choose **Configure Shadowrocket** after installing ciadpi. For other clients, use `127.0.0.1` and the active port shown in DPI Killer, not just the configured preferred port.
+For Shadowrocket, choose **Configure Shadowrocket** after installing ciadpi. For other clients, use `127.0.0.1` and the active port shown in DPI Killer, not just the configured preferred port.
 
 ## Settings
 
-- **Backend:** choose an engine or executable and manage engine updates. Version checks run automatically when settings open; the refresh icon checks again.
-- **Network:** connection and runtime status, bypass presets and packet options, and DNS settings for SpoofDPI, grouped into separate cards.
-- **App:** startup, application updates, reconnection, IPv6, VPN-client compatibility, and Packet Tunnel availability.
+- **Backend:** choose an engine and manage engine updates. Version checks run automatically when settings open; the refresh icon checks again.
+- **Network:** local port, current mode, explicit system proxy, bypass settings, and DNS settings for SpoofDPI. The separate **Optimize** action sets the macOS TTL to 65 for hotspot use.
+- **App:** launch at login, application updates, reconnection, and Shadowrocket setup.
 - **Manual:** extra arguments per engine and a preview of the launch command. Validation catches conflicts with options already managed by the interface.
 
-Use **Save & Restart** to apply settings. Available controls depend on the selected engine.
+Use **Save** while stopped, or **Save & Restart** while running. Available controls depend on the selected engine.
 
 ## Backend installation
 
@@ -69,7 +68,7 @@ ciadpi is built from ByeDPI source in the application's support directory. This 
 xcode-select --install
 ```
 
-SpoofDPI is downloaded from a matching upstream macOS release asset. You can also select your own executable in Settings.
+SpoofDPI is downloaded from a matching upstream macOS release asset.
 
 ## Build from source
 
@@ -79,7 +78,7 @@ Use a Mac with Xcode and the tools required by [build.sh](build.sh):
 git clone https://github.com/iddictive/DPI-Killer.git
 cd DPI-Killer
 ./build.sh
-open DPIKiller.app
+open .build.noindex/DPIKiller.app
 ```
 
 Create a disk image with `./build.sh --dmg`. Application versions and backend versions are independent: updating ciadpi or SpoofDPI does not update DPI Killer itself.
@@ -99,21 +98,21 @@ Review and run the repository's [uninstall script](scripts/uninstall.sh) to remo
 
 ## Русский
 
-DPI Killer управляет локальным прокси для обхода DPI из строки меню macOS. Поддерживает ByeDPI (`ciadpi`, SOCKS5), SpoofDPI (HTTP) и собственный исполняемый файл.
+DPI Killer управляет локальным прокси для обхода DPI из строки меню macOS. Поддерживает ByeDPI (`ciadpi`, SOCKS5) и SpoofDPI (HTTP).
 
 ### Начало работы
 
 1. Скачайте DMG из [Releases](https://github.com/iddictive/DPI-Killer/releases/latest) и перенесите приложение в Applications.
 2. Выберите или установите движок в настройках.
-3. Запустите прокси из строки меню.
+3. Запустите прокси из строки меню. Само приложение открывается с выключенным прокси.
 4. Для подключения другого клиента используйте `127.0.0.1` и активный порт приложения: он может отличаться от заданного, если тот занят.
 
 Требуется macOS 13 или новее. Сборки имеют ad-hoc подпись без нотариализации Apple; при первом запуске может потребоваться подтверждение macOS.
 
 ### Настройки и режимы
 
-В **Backend** выбирается движок и проверяются его обновления. В **Network** собраны подключение, обход DPI и DNS. В **App** находятся запуск, обновления приложения и совместимость с VPN-клиентами. **Manual** позволяет добавить аргументы отдельно для каждого движка. Изменения применяются кнопкой **Save & Restart**.
+В **Backend** выбирается движок и проверяются его обновления. В **Network** находятся локальный порт, явное включение системного прокси, настройки обхода и DNS. Кнопка **Оптимизировать** отдельно устанавливает TTL 65 для раздачи интернета. В **App** находятся автозапуск, обновления и настройка Shadowrocket. **Manual** позволяет добавить аргументы отдельно для каждого движка. Настройки сохраняются кнопкой **Сохранить**; при работающем прокси кнопка перезапустит его.
 
-Системный прокси настраивает сетевые службы macOS. В режиме совместимости маршрутизацией управляет внешний VPN-клиент, а DPI Killer предоставляет локальный прокси. Packet Tunnel требует специальной сборки с расширением и соответствующей подписью; обычная прокси-сборка его не предоставляет.
+По умолчанию движок работает только на `127.0.0.1` и не меняет сетевые настройки macOS. При явном включении системного прокси приложение сначала проверяет HTTPS через движок, затем меняет прокси только для текущего подключения и восстанавливает прежние значения при остановке. Если у подключения уже есть прокси, запуск в этом режиме отменяется. Настоящего VPN-туннеля в этих режимах нет.
 
 Для сборки ciadpi нужны `cc` и `make` из Command Line Tools. SpoofDPI загружается из upstream-релиза. DNS-настройки доступны только для SpoofDPI. Для диагностики используйте Connectivity Diagnostics и Event Logs; результат обхода зависит от сети и выбранных параметров.

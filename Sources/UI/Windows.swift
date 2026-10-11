@@ -776,14 +776,24 @@ final class LoaderProgressView: NSView {
         wantsLayer = true
         layer?.addSublayer(trackLayer)
         layer?.addSublayer(fillLayer)
-
-        trackLayer.backgroundColor = AppTheme.progressTrack.cgColor
-        fillLayer.colors = [
-            NSColor.controlAccentColor.withAlphaComponent(0.95).cgColor,
-            AppTheme.accentSoft.withAlphaComponent(0.88).cgColor
-        ]
+        updateAppearanceColors()
         fillLayer.startPoint = CGPoint(x: 0, y: 0.5)
         fillLayer.endPoint = CGPoint(x: 1, y: 0.5)
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateAppearanceColors()
+    }
+
+    private func updateAppearanceColors() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            trackLayer.backgroundColor = AppTheme.progressTrack.cgColor
+            fillLayer.colors = [
+                NSColor.controlAccentColor.withAlphaComponent(0.95).cgColor,
+                AppTheme.accentSoft.withAlphaComponent(0.88).cgColor
+            ]
+        }
     }
 
     override func layout() {

@@ -49,22 +49,22 @@ final class SettingsStore {
     }
 
     var customArgs: String {
-        get { defaults.string(forKey: "customArgs") ?? "--system-proxy" }
+        get { defaults.string(forKey: "customArgs") ?? "" }
         set { defaults.set(newValue, forKey: "customArgs") }
     }
 
     var defaultTTL: String {
-        get { defaults.string(forKey: "defaultTTL") ?? "128" }
+        get { defaults.string(forKey: "defaultTTL") ?? "64" }
         set { defaults.set(newValue, forKey: "defaultTTL") }
     }
 
     var splitMode: String {
-        get { defaults.string(forKey: "splitMode") ?? "random" }
+        get { defaults.string(forKey: "splitMode") ?? "sni" }
         set { defaults.set(newValue, forKey: "splitMode") }
     }
 
     var httpsDisorder: Bool {
-        get { defaults.object(forKey: "httpsDisorder") == nil ? true : defaults.bool(forKey: "httpsDisorder") }
+        get { defaults.bool(forKey: "httpsDisorder") }
         set { defaults.set(newValue, forKey: "httpsDisorder") }
     }
 
@@ -109,11 +109,14 @@ final class SettingsStore {
     }
 
     var disableIpv6: Bool {
-        get { defaults.bool(forKey: "disableIpv6") }
-        set {
-            defaults.set(newValue, forKey: "disableIpv6")
-            applyIpv6Settings(newValue)
-        }
+        get { false }
+        set { defaults.set(false, forKey: "disableIpv6") }
+    }
+
+    // Legacy --system-proxy flags do not opt users into changing macOS settings.
+    var systemProxyEnabled: Bool {
+        get { defaults.bool(forKey: "systemProxyEnabled") }
+        set { defaults.set(newValue, forKey: "systemProxyEnabled") }
     }
 
     var autoReconnect: Bool {
@@ -122,13 +125,13 @@ final class SettingsStore {
     }
 
     var vpnClientCompatibilityEnabled: Bool {
-        get { defaults.object(forKey: "vpnClientCompatibilityEnabled") as? Bool ?? false }
-        set { defaults.set(newValue, forKey: "vpnClientCompatibilityEnabled") }
+        get { false }
+        set { defaults.set(false, forKey: "vpnClientCompatibilityEnabled") }
     }
 
     var vpnModeEnabled: Bool {
-        get { defaults.object(forKey: "vpnModeEnabled") as? Bool ?? false }
-        set { defaults.set(newValue, forKey: "vpnModeEnabled") }
+        get { false }
+        set { defaults.set(false, forKey: "vpnModeEnabled") }
     }
 
     var lastAppliedSystemProxyPort: Int? {
@@ -194,9 +197,14 @@ final class SettingsStore {
         let stored = defaults.string(forKey: "binaryPath") ?? ""
         if let raw = defaults.string(forKey: backendSelectionKey),
            let selection = BackendSelection(rawValue: raw) {
-            return selection
+            switch selection {
+            case .ciadpi, .spoofdpi:
+                return selection
+            case .automatic, .dual, .custom:
+                return currentEngine(for: binaryPath) == .ciadpi ? .ciadpi : .spoofdpi
+            }
         }
-        return inferredBackendSelection(from: stored)
+        return inferredBackendSelection(from: stored) == .spoofdpi ? .spoofdpi : .ciadpi
     }
 
     private func inferredBackendSelection(from stored: String) -> BackendSelection {
@@ -211,7 +219,7 @@ final class SettingsStore {
     }
 
     var usesSystemProxy: Bool {
-        !vpnClientCompatibilityEnabled && selectedFlags.contains("--system-proxy")
+        systemProxyEnabled
     }
 
     func loadDraft() -> SettingsDraft {
@@ -230,6 +238,7 @@ final class SettingsStore {
             autoDownload: autoDownload,
             disableIpv6: disableIpv6,
             autoReconnect: autoReconnect,
+            systemProxyEnabled: systemProxyEnabled,
             vpnClientCompatibilityEnabled: vpnClientCompatibilityEnabled,
             vpnModeEnabled: vpnModeEnabled
         )
@@ -259,25 +268,22 @@ final class SettingsStore {
         disableIpv6 = draft.common.disableIpv6
         autoReconnect = draft.common.autoReconnect
         vpnClientCompatibilityEnabled = draft.common.vpnClientCompatibilityEnabled
+        systemProxyEnabled = draft.common.systemProxyEnabled
         vpnModeEnabled = draft.common.vpnModeEnabled && !draft.common.vpnClientCompatibilityEnabled
 
-        defaultTTL = clampedString(draft.common.defaultTTL, defaultValue: 128, range: 1...255)
+        defaultTTL = clampedString(draft.common.defaultTTL, defaultValue: 64, range: 1...255)
         splitMode = draft.common.splitMode.isEmpty ? "sni" : draft.common.splitMode
         httpsDisorder = draft.common.httpsDisorder
         httpsFakeCount = clampedString(draft.common.httpsFakeCount, defaultValue: 0, range: 0...100)
-        httpsChunkSize = clampedString(draft.common.httpsChunkSize, defaultValue: 20, range: 1...1000)
+        httpsChunkSize = clampedString(draft.common.httpsChunkSize, defaultValue: 20, range: 1...255)
         dnsAddr = draft.common.dnsAddr.trimmingCharacters(in: .whitespacesAndNewlines)
         dnsMode = draft.common.dnsMode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? "udp"
             : draft.common.dnsMode.trimmingCharacters(in: .whitespacesAndNewlines)
         dnsHttpsUrl = draft.common.dnsHttpsUrl.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        var ciadpiFlags = draft.ciadpi.selectedFlags
-        var spoofdpiFlags = draft.spoofdpi.selectedFlags
-        if draft.common.vpnClientCompatibilityEnabled {
-            ciadpiFlags.remove("--system-proxy")
-            spoofdpiFlags.remove("--system-proxy")
-        }
+        let ciadpiFlags = draft.ciadpi.selectedFlags
+        let spoofdpiFlags = draft.spoofdpi.selectedFlags
 
         saveSelectedFlags(ciadpiFlags, for: .ciadpi)
         saveSelectedFlags(spoofdpiFlags, for: .spoofdpi)
@@ -362,14 +368,14 @@ final class SettingsStore {
     }
 
     func applyIpv6Preference() {
-        applyIpv6Settings(disableIpv6)
+        // DPI Killer no longer changes system IPv6 settings.
     }
 
     func applyMobileHotspotPreset() {
         defaultTTL = "65"
         splitMode = "random"
         httpsDisorder = true
-        httpsFakeCount = resolvedEngine == .ciadpi ? "1" : "0"
+        httpsFakeCount = "0"
         httpsChunkSize = "20"
     }
 
@@ -411,7 +417,7 @@ final class SettingsStore {
     }
 
     func restoreIpv6Defaults() {
-        applyIpv6Settings(false)
+        // Previous releases could not know the user's original IPv6 setting.
     }
 
     func updateArgs(
@@ -608,9 +614,9 @@ final class SettingsStore {
         let manualParts = argumentParts(from: manualArgsString(for: explicitPath))
         let flags = selectedFlags(for: engine)
         let port = (portOverride ?? (Int(localPort.trimmingCharacters(in: .whitespaces)) ?? 8080)).clamped(to: 1...65535)
-        let ttlValue = (Int(defaultTTL.trimmingCharacters(in: .whitespaces)) ?? 128).clamped(to: 1...255)
+        let ttlValue = (Int(defaultTTL.trimmingCharacters(in: .whitespaces)) ?? 64).clamped(to: 1...255)
         let fakeCount = (Int(httpsFakeCount.trimmingCharacters(in: .whitespaces)) ?? 0).clamped(to: 0...100)
-        let chunkSize = (Int(httpsChunkSize.trimmingCharacters(in: .whitespaces)) ?? 20).clamped(to: 1...1000)
+        let chunkSize = (Int(httpsChunkSize.trimmingCharacters(in: .whitespaces)) ?? 20).clamped(to: 1...255)
 
         switch engine {
         case .spoofdpi:
@@ -618,10 +624,8 @@ final class SettingsStore {
             if spoofdpiSupportsHeadlessMode(binaryPath: explicitPath ?? binaryPath) {
                 args.append("--no-tui")
             }
-            if flags.contains("--silent") { args.append("--silent") }
             if flags.contains("--dns-ipv4-only") { args += ["--dns-qtype", "ipv4"] }
             if flags.contains("--debug") { args += ["--log-level", "debug"] }
-            args += ["--default-fake-ttl", "\(ttlValue)"]
             if !splitMode.isEmpty && splitMode != "sni" {
                 args += ["--https-split-mode", splitMode]
             }
@@ -672,11 +676,6 @@ final class SettingsStore {
             }
             if httpsDisorder {
                 args += ["--disorder", "1"]
-            }
-            if fakeCount > 0 {
-                if let fakeFlag = ciadpiFakeFlag(binaryPath: explicitPath ?? binaryPath) {
-                    args += [fakeFlag, "-1", "--ttl", "8"]
-                }
             }
             if let supported = ciadpiSupportedOptions(binaryPath: explicitPath ?? binaryPath) {
                 args = filteredCiadpiArgs(args, supported: supported)
@@ -782,15 +781,6 @@ final class SettingsStore {
         return "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
-    private func applyIpv6Settings(_ disable: Bool) {
-        let state = disable ? "off" : "on"
-        let script = "services=$(networksetup -listallnetworkservices | grep -v '*'); while IFS= read -r service; do networksetup -setv6\(state) \"$service\" 2>/dev/null; done <<< \"$services\""
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        process.arguments = ["-c", script]
-        try? process.run()
-    }
-
     private func sysctlIntValue(_ name: String) -> Int? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/sysctl")
@@ -857,21 +847,11 @@ final class SettingsStore {
         return options
     }
 
-    /// Fake-packet offset flag for the installed binary across the upstream
-    /// `--fake` → `--fake-offset` rename. Nil when neither exists; the caller
-    /// then omits fake packets and starts with degraded bypass instead of dying.
-    func ciadpiFakeFlag(binaryPath: String) -> String? {
-        guard let options = ciadpiSupportedOptions(binaryPath: binaryPath) else { return "--fake-offset" }
-        if options.contains("--fake-offset") { return "--fake-offset" }
-        if options.contains("--fake") { return "--fake" }
-        return nil
-    }
-
     /// Drops generated ciadpi flags the installed binary no longer knows, with
     /// their values. `-p`/`--def-ttl` are never dropped: without them nothing can
     /// work, so a loud failure beats a silently misconfigured launch.
     func filteredCiadpiArgs(_ args: [String], supported: Set<String>) -> [String] {
-        let droppable: Set<String> = ["--auto", "--split", "--tlsrec", "--disorder", "--fake", "--fake-offset", "--ttl"]
+        let droppable: Set<String> = ["--auto", "--split", "--tlsrec", "--disorder"]
         var filtered: [String] = []
         var index = 0
         while index < args.count {

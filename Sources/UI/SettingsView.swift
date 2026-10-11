@@ -30,7 +30,7 @@ enum DPISettingsTokens {
 
     static let titleFont = Font.system(size: 13, weight: .semibold)
     static let bodyFont = Font.system(size: 13, weight: .regular)
-    static let labelFont = Font.system(size: 12, weight: .medium)
+    static let labelFont = Font.system(size: 13, weight: .regular)
     static let captionFont = Font.system(size: 12, weight: .regular)
     static let badgeFont = Font.system(size: 11, weight: .semibold)
 }
@@ -68,7 +68,7 @@ struct SettingsBadge: View {
     var body: some View {
         Text(title)
             .font(DPISettingsTokens.badgeFont)
-            .foregroundStyle(style.color)
+            .foregroundStyle(.primary)
             .lineLimit(1)
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
@@ -186,7 +186,7 @@ struct SettingsRow<Content: View>: View {
         HStack(alignment: .top, spacing: 12) {
             Text(label)
                 .font(DPISettingsTokens.labelFont)
-                .foregroundStyle(DPISettingsTokens.secondaryText)
+                .foregroundStyle(.primary)
                 .frame(width: DPISettingsTokens.rowLabelWidth, alignment: .leading)
                 .padding(.top, 4)
 
@@ -252,9 +252,9 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Text(L10n.shared.settingsTitle)
+            Text(viewModel.selectedTab.title)
                 .font(DPISettingsTokens.titleFont)
-                .foregroundStyle(DPISettingsTokens.secondaryText)
+                .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity)
                 .frame(height: 32)
                 .accessibilityAddTraits(.isHeader)
@@ -281,7 +281,7 @@ struct SettingsView: View {
                 statusText: viewModel.footerStatusText,
                 canSave: viewModel.canSave,
                 cancelTitle: L10n.shared.cancel,
-                saveTitle: L10n.shared.saveAndRestart,
+                saveTitle: viewModel.backendRunning ? L10n.shared.saveAndRestart : text(ru: "Сохранить", en: "Save"),
                 onCancel: cancel,
                 onSave: save
             )
@@ -329,29 +329,12 @@ struct SettingsView: View {
                     }
                 }
 
-                if viewModel.backendSelection == .custom {
-                    SettingsRow(viewModel.backendPathLabel) {
-                        TextField(L10n.shared.binaryPlaceholder, text: $viewModel.customBinaryPath)
-                            .textFieldStyle(.roundedBorder)
-                    }
+                if !FileManager.default.isExecutableFile(atPath: viewModel.resolvedBinaryPath) {
+                    Text(L10n.shared.backendMissingSuffix)
+                        .font(DPISettingsTokens.captionFont)
+                        .foregroundStyle(DPISettingsTokens.warning)
                 }
-                if viewModel.backendSelection == .dual {
-                    ForEach(viewModel.dualPaths, id: \.path) { item in
-                        if !FileManager.default.isExecutableFile(atPath: item.path) {
-                            Text(item.engine.displayName + " " + L10n.shared.backendMissingSuffix)
-                                .font(DPISettingsTokens.captionFont)
-                                .foregroundStyle(DPISettingsTokens.warning)
-                        }
-                        pathText(item.path)
-                    }
-                } else {
-                    if !FileManager.default.isExecutableFile(atPath: viewModel.resolvedBinaryPath) {
-                        Text(L10n.shared.backendMissingSuffix)
-                            .font(DPISettingsTokens.captionFont)
-                            .foregroundStyle(DPISettingsTokens.warning)
-                    }
-                    pathText(viewModel.resolvedBinaryPath)
-                }
+                pathText(viewModel.resolvedBinaryPath)
 
             }
 
@@ -380,20 +363,35 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            Toggle(L10n.shared.descSystemProxy, isOn: $viewModel.systemProxyEnabled)
+                .toggleStyle(.checkbox)
+
+            Text(L10n.shared.systemProxyModeHelp)
+                .font(DPISettingsTokens.captionFont)
+                .foregroundStyle(DPISettingsTokens.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if !viewModel.systemProxyEnabled {
+                Text(text(ru: "Локальный режим: подключи приложение к прокси вручную или через Shadowrocket. Настройки macOS не меняются.", en: "Local mode: connect an app to the proxy manually or through Shadowrocket. macOS settings stay unchanged."))
+                    .font(DPISettingsTokens.captionFont)
+                    .foregroundStyle(DPISettingsTokens.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             SettingsRow(L10n.shared.hotspotStatusTitle) {
                 HStack(spacing: 8) {
                     Text(viewModel.networkOptimizationStatusTitle)
                         .font(DPISettingsTokens.captionFont)
-                        .foregroundStyle(viewModel.networkOptimizationBadgeStyle.color)
+                        .foregroundStyle(.primary)
                     Spacer(minLength: 0)
                     if viewModel.isApplyingNetworkOptimization {
                         ProgressView().controlSize(.small)
                     } else if viewModel.needsNetworkOptimization {
                         Button(text(ru: "Оптимизировать", en: "Optimize")) {
-                            viewModel.applyMobilePreset()
+                            viewModel.applyNetworkOptimization()
                         }
                         .buttonStyle(.bordered)
-                        .help(text(ru: "Применить пресет Hotspot, сохранить настройки и оптимизировать сеть для мобильной точки доступа.", en: "Apply the Hotspot preset, save settings, and optimize the network for a mobile hotspot."))
+                        .help(text(ru: "Установить TTL 65 для раздачи интернета. macOS запросит пароль администратора.", en: "Set TTL to 65 for hotspot use. macOS will request administrator access."))
                     }
                 }
             }
@@ -432,10 +430,12 @@ struct SettingsView: View {
             }
             Divider()
 
-            SettingsRow(L10n.shared.ttlTitle, help: L10n.shared.tipTTL) {
-                TextField(L10n.shared.ttlPlaceholder, text: $viewModel.defaultTTL)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 90)
+            if viewModel.resolvedEngine == .ciadpi {
+                SettingsRow(L10n.shared.ttlTitle, help: L10n.shared.tipTTL) {
+                    TextField(L10n.shared.ttlPlaceholder, text: $viewModel.defaultTTL)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 90)
+                }
             }
 
             SettingsRow(L10n.shared.splitModeTitle, help: L10n.shared.tipSplitMode) {
@@ -455,20 +455,8 @@ struct SettingsView: View {
                     .labelsHidden()
             }
 
-            SettingsRow(
-                viewModel.resolvedEngine == .ciadpi
-                    ? text(ru: "Ложные пакеты", en: "Fake packets") : L10n.shared.httpsFakeCount,
-                help: viewModel.resolvedEngine == .ciadpi ? text(ru: "Добавлять ложные пакеты для обхода DPI.", en: "Add fake packets to bypass DPI.") : L10n.shared.tipFakeCount
-            ) {
-                if viewModel.resolvedEngine == .ciadpi {
-                    Toggle("", isOn: Binding(
-                        get: { viewModel.ciadpiFakeEnabled },
-                        set: { viewModel.ciadpiFakeEnabled = $0 }
-                    ))
-                    .toggleStyle(.checkbox)
-                    .labelsHidden()
-
-                } else {
+            if viewModel.resolvedEngine == .spoofdpi {
+                SettingsRow(L10n.shared.httpsFakeCount, help: L10n.shared.tipFakeCount) {
                     TextField("0", text: $viewModel.httpsFakeCount)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 90)
@@ -529,16 +517,8 @@ struct SettingsView: View {
                 appToggle(title: L10n.shared.autoDownloadToggle, isOn: $viewModel.autoDownload)
             }
 
-            SettingsCard(title: text(ru: "Сетевая совместимость", en: "Network Compatibility")) {
-                appToggle(title: L10n.shared.disableIpv6, help: L10n.shared.ipv6Warning, isOn: $viewModel.disableIpv6)
+            SettingsCard(title: text(ru: "Подключение", en: "Connection")) {
                 appToggle(title: L10n.shared.autoReconnect, help: L10n.shared.tipAutoReconnect, isOn: $viewModel.autoReconnect)
-                appToggle(title: L10n.shared.vpnClientCompatibility, help: L10n.shared.tipVPNClientCompatibility, isOn: $viewModel.vpnClientCompatibilityEnabled)
-
-                if viewModel.vpnClientCompatibilityEnabled {
-                    Text(viewModel.vpnClientCompatibilityStatus)
-                        .font(DPISettingsTokens.captionFont)
-                        .foregroundStyle(DPISettingsTokens.secondaryText)
-                    }
 
                 Button(viewModel.isConfiguringShadowrocket ? L10n.shared.configuringShadowrocket : L10n.shared.configureShadowrocket) {
                     viewModel.configureShadowrocket()
@@ -546,32 +526,6 @@ struct SettingsView: View {
                 .buttonStyle(.bordered)
                 .disabled(viewModel.isConfiguringShadowrocket || viewModel.isApplyingNetworkOptimization)
 
-                Toggle(isOn: $viewModel.vpnModeEnabled) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(L10n.shared.vpnModeToggle)
-                            .font(DPISettingsTokens.bodyFont)
-
-                        Text(L10n.shared.tipVPNMode)
-                            .font(DPISettingsTokens.captionFont)
-                            .foregroundStyle(DPISettingsTokens.secondaryText)
-                    }
-                }
-                .toggleStyle(.checkbox)
-                .disabled(!viewModel.vpnAvailable || viewModel.vpnClientCompatibilityEnabled)
-                .opacity(viewModel.vpnAvailable && !viewModel.vpnClientCompatibilityEnabled ? 1 : 0.55)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(viewModel.vpnStatusTitle)
-                        .font(DPISettingsTokens.captionFont)
-                        .foregroundStyle(viewModel.vpnBadgeStyle.color)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Button(text(ru: "Проверить доступ", en: "Check Access")) {
-                        viewModel.ensureSystemExtensionActivated()
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(viewModel.isActivatingSystemExtension)
-                }
             }
         }
     }
@@ -661,7 +615,7 @@ struct SettingsView: View {
                      ? text(ru: "Доступна \(latest)", en: "\(latest) available")
                      : message)
                     .font(DPISettingsTokens.captionFont)
-                    .foregroundStyle(style.color)
+                    .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                 if !busy && !canUpdate && style != .success {
                     Button(action: check) {
@@ -778,6 +732,7 @@ final class SettingsViewModel: ObservableObject {
     @Published var autoDownload: Bool
     @Published var disableIpv6: Bool
     @Published var autoReconnect: Bool
+    @Published var systemProxyEnabled: Bool
     @Published var vpnClientCompatibilityEnabled: Bool
     @Published var vpnModeEnabled: Bool
     @Published var ciadpiManualArgs: String
@@ -801,16 +756,14 @@ final class SettingsViewModel: ObservableObject {
     @Published private var vpnAvailabilityIssue: String?
     @Published private var tunnelActive: Bool
     @Published private var networkOptimizationApplied = false
-    @Published private var backendRunning = false
+    @Published private(set) var backendRunning = false
     @Published private var runtimePort: Int?
     @Published private var runtimeCiadpiPort: Int?
 
-    let backendSelections: [BackendSelection] = [.automatic, .ciadpi, .spoofdpi, .dual, .custom]
+    let backendSelections: [BackendSelection] = [.ciadpi, .spoofdpi]
     let splitModes = ["sni", "random", "chunk", "none"]
     let dnsModes = ["udp", "https", "system"]
     let options: [SettingsArgumentOption] = [
-        SettingsArgumentOption(flag: "--system-proxy", description: L10n.shared.descSystemProxy),
-        SettingsArgumentOption(flag: "--silent", description: L10n.shared.descSilent),
         SettingsArgumentOption(flag: "--dns-ipv4-only", description: L10n.shared.descIpv4Only),
         SettingsArgumentOption(flag: "--debug", description: L10n.shared.descDebug),
         SettingsArgumentOption(flag: "--policy-auto", description: L10n.shared.descPolicyAuto)
@@ -848,6 +801,7 @@ final class SettingsViewModel: ObservableObject {
         autoDownload = draft.common.autoDownload
         disableIpv6 = draft.common.disableIpv6
         autoReconnect = draft.common.autoReconnect
+        systemProxyEnabled = draft.common.systemProxyEnabled
         vpnClientCompatibilityEnabled = draft.common.vpnClientCompatibilityEnabled
         vpnModeEnabled = draft.common.vpnModeEnabled
         ciadpiManualArgs = draft.ciadpi.manualArgs
@@ -934,34 +888,9 @@ final class SettingsViewModel: ObservableObject {
     }
 
     var runtimeStatusTitle: String {
-        if isDualSelection {
-            let spoofPort = runtimePort ?? DPIKillerManager.shared.proxyPort
-            let ciaPort = runtimeCiadpiPort ?? DPIKillerManager.shared.activeCiadpiPort
-            let portSuffix: String
-            if backendRunning, let ciaPort {
-                portSuffix = " • Ports \(spoofPort)/\(ciaPort)"
-            } else if backendRunning {
-                portSuffix = " • Port \(spoofPort)"
-            } else {
-                portSuffix = ""
-            }
-            if vpnClientCompatibilityEnabled {
-                return L10n.shared.runtimeModeLocalProxy + portSuffix
-            }
-            if vpnModeEnabled {
-                return (tunnelActive ? L10n.shared.runtimeModeVpn : L10n.shared.vpnStatusReady) + portSuffix
-            }
-            let proxyLabel = dualUsesSystemProxy ? L10n.shared.runtimeModeProxy : L10n.shared.runtimeModeLocalProxy
-            return proxyLabel + portSuffix
-        }
+        guard backendRunning else { return L10n.shared.statusStopped }
         let portSuffix = backendRunning ? " • Port \(runtimePort ?? DPIKillerManager.shared.proxyPort)" : ""
-        if vpnClientCompatibilityEnabled {
-            return L10n.shared.runtimeModeLocalProxy + portSuffix
-        }
-        if vpnModeEnabled {
-            return (tunnelActive ? L10n.shared.runtimeModeVpn : L10n.shared.vpnStatusReady) + portSuffix
-        }
-        return (selectedFlags(for: resolvedEngine).contains("--system-proxy") ? L10n.shared.runtimeModeProxy : L10n.shared.runtimeModeLocalProxy) + portSuffix
+        return (SystemProxyController.shared.hasLease ? L10n.shared.runtimeModeProxy : L10n.shared.runtimeModeLocalProxy) + portSuffix
     }
 
     var runtimeBadgeStyle: SettingsBadgeStyle {
@@ -1206,7 +1135,7 @@ final class SettingsViewModel: ObservableObject {
             defaultTTL = "65"
             splitMode = "random"
             httpsDisorder = true
-            httpsFakeCount = (resolvedEngine == .ciadpi || isDualSelection) ? "1" : "0"
+            httpsFakeCount = "0"
             httpsChunkSize = "20"
         case .conservative:
             defaultTTL = "128"
@@ -1242,11 +1171,7 @@ final class SettingsViewModel: ObservableObject {
             self.networkOptimizationApplied = self.store.isNetworkOptimizationApplied()
             if success {
                 self.footerStatus = L10n.shared.fixHotspotSuccess
-                if DPIKillerManager.shared.isRunning {
-                    (NSApp.delegate as? AppDelegate)?.restartRuntime()
-                } else {
-                    (NSApp.delegate as? AppDelegate)?.refreshUI()
-                }
+                (NSApp.delegate as? AppDelegate)?.refreshUI()
             } else {
                 self.footerStatus = error?.isEmpty == false ? error : L10n.shared.fixHotspotFailed
                 (NSApp.delegate as? AppDelegate)?.refreshUI()
@@ -1266,7 +1191,8 @@ final class SettingsViewModel: ObservableObject {
         footerStatus = L10n.shared.configuringShadowrocket
         backendSelection = .ciadpi
         customBinaryPath = ciadpiPath
-        vpnClientCompatibilityEnabled = true
+        systemProxyEnabled = false
+        vpnClientCompatibilityEnabled = false
         vpnModeEnabled = false
         flagsByEngine[.ciadpi]?.remove("--system-proxy")
         flagsByEngine[.spoofdpi]?.remove("--system-proxy")
@@ -1459,11 +1385,11 @@ final class SettingsViewModel: ObservableObject {
         }
         let sanitizedCommon = CommonSettings(
             localPort: String(clamp(localPort, defaultValue: 8080, range: 1...65535)),
-            defaultTTL: String(clamp(defaultTTL, defaultValue: 128, range: 1...255)),
+            defaultTTL: String(clamp(defaultTTL, defaultValue: 64, range: 1...255)),
             splitMode: splitMode.isEmpty ? "sni" : splitMode,
             httpsDisorder: httpsDisorder,
             httpsFakeCount: String(clamp(httpsFakeCount, defaultValue: 0, range: 0...100)),
-            httpsChunkSize: String(clamp(httpsChunkSize, defaultValue: 20, range: 1...1000)),
+            httpsChunkSize: String(clamp(httpsChunkSize, defaultValue: 20, range: 1...255)),
             dnsAddr: dnsAddr.trimmingCharacters(in: .whitespacesAndNewlines),
             dnsMode: dnsMode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "udp" : dnsMode.trimmingCharacters(in: .whitespacesAndNewlines),
             dnsHttpsUrl: dnsHttpsUrl.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -1472,6 +1398,7 @@ final class SettingsViewModel: ObservableObject {
             autoDownload: autoDownload,
             disableIpv6: disableIpv6,
             autoReconnect: autoReconnect,
+            systemProxyEnabled: systemProxyEnabled,
             vpnClientCompatibilityEnabled: sanitizedVPNClientCompatibility,
             vpnModeEnabled: vpnModeEnabled && vpnAvailable && !sanitizedVPNClientCompatibility
         )
@@ -1559,9 +1486,9 @@ final class SettingsViewModel: ObservableObject {
         let manualParts = argumentParts(from: manualArgs(for: engine))
         let flags = selectedFlags(for: engine).intersection(BackendCapability.forEngine(engine).supportedFlags)
         let port = clamp(localPort, defaultValue: 8080, range: 1...65535)
-        let ttlValue = clamp(defaultTTL, defaultValue: 128, range: 1...255)
+        let ttlValue = clamp(defaultTTL, defaultValue: 64, range: 1...255)
         let fakeCount = clamp(httpsFakeCount, defaultValue: 0, range: 0...100)
-        let chunkSize = clamp(httpsChunkSize, defaultValue: 20, range: 1...1000)
+        let chunkSize = clamp(httpsChunkSize, defaultValue: 20, range: 1...255)
 
         switch engine {
         case .spoofdpi:
@@ -1569,10 +1496,8 @@ final class SettingsViewModel: ObservableObject {
             if spoofdpiSupportsHeadlessMode(binaryPath: binaryPath) {
                 args.append("--no-tui")
             }
-            if flags.contains("--silent") { args.append("--silent") }
             if flags.contains("--dns-ipv4-only") { args += ["--dns-qtype", "ipv4"] }
             if flags.contains("--debug") { args += ["--log-level", "debug"] }
-            args += ["--default-fake-ttl", "\(ttlValue)"]
             if !splitMode.isEmpty && splitMode != "sni" {
                 args += ["--https-split-mode", splitMode]
             }
@@ -1619,11 +1544,6 @@ final class SettingsViewModel: ObservableObject {
             }
             if httpsDisorder {
                 args += ["--disorder", "1"]
-            }
-            if fakeCount > 0 {
-                if let fakeFlag = store.ciadpiFakeFlag(binaryPath: binaryPath) {
-                    args += [fakeFlag, "-1", "--ttl", "8"]
-                }
             }
             if let supported = store.ciadpiSupportedOptions(binaryPath: binaryPath) {
                 args = store.filteredCiadpiArgs(args, supported: supported)

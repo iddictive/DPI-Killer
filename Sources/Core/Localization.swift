@@ -12,9 +12,9 @@ struct L10n {
     var statusActive: String { isRussian ? "Статус: активно" : "Status: Active" }
     var statusPartial: String { isRussian ? "Статус: требует внимания" : "Status: Needs attention" }
     var statusStopped: String { isRussian ? "Статус: остановлено" : "Status: Stopped" }
-    var networkOptimizationActive: String { isRussian ? "Сеть: оптимизирована" : "Network: Optimized" }
-    var networkOptimizationInactive: String { isRussian ? "Сеть: нужна оптимизация" : "Network: Needs optimization" }
-    var networkOptimizationApply: String { isRussian ? "Оптимизировать сеть..." : "Optimize Network..." }
+    var networkOptimizationActive: String { isRussian ? "TTL 65 установлен" : "TTL 65 is set" }
+    var networkOptimizationInactive: String { isRussian ? "TTL для раздачи не 65" : "Hotspot TTL is not 65" }
+    var networkOptimizationApply: String { isRussian ? "Установить TTL 65 для раздачи..." : "Set hotspot TTL to 65..." }
     var networkOptimizationApplying: String { isRussian ? "Оптимизация сети..." : "Optimizing network..." }
     var menuRuntimeSection: String { isRussian ? "Состояние" : "Runtime" }
     var menuToolsSection: String { isRussian ? "Инструменты" : "Tools" }
@@ -44,7 +44,7 @@ struct L10n {
     var argumentsTitle: String { isRussian ? "Аргументы (флаги):" : "Arguments (Flags):" }
     var manualArgsTitle: String { isRussian ? "Доп. аргументы:" : "Manual Arguments:" }
     var manualArgsPlaceholder: String { isRussian ? "-p 8080 -window-size 10" : "-p 8080 -window-size 10" }
-    var manualArgsPlaceholderCiadpi: String { isRussian ? "--fake-offset -1 --ttl 8" : "--fake-offset -1 --ttl 8" }
+    var manualArgsPlaceholderCiadpi: String { isRussian ? "Дополнительные аргументы ciadpi" : "Extra ciadpi arguments" }
     var manualArgsPlaceholderSpoofdpi: String { isRussian ? "--enable-doh" : "--enable-doh" }
     var autoLaunchTitle: String { isRussian ? "Автозагрузка:" : "Auto Launch:" }
     var launchAtLogin: String { isRussian ? "Запускать при старте системы" : "Launch at system startup" }
@@ -63,7 +63,7 @@ struct L10n {
 
     var portTitle: String { isRussian ? "Локальный порт:" : "Local Port:" }
     var portPlaceholder: String { isRussian ? "По умолч: 8080" : "Default: 8080" }
-    var hotspotStatusTitle: String { isRussian ? "Состояние хотспота:" : "Hotspot Status:" }
+    var hotspotStatusTitle: String { isRussian ? "TTL для раздачи:" : "Hotspot TTL:" }
     var hotspotStatusOptimized: String { isRussian ? "Оптимизировано" : "Optimized" }
     var hotspotStatusThrottled: String { isRussian ? "Ограничено провайдером" : "Throttled by ISP" }
     var fixHotspotButton: String { isRussian ? "Снять ограничения (Sudo)" : "Remove Limits (Sudo)" }
@@ -78,6 +78,11 @@ struct L10n {
     var dnsDisabledForCiadpi: String { isRussian ? "DNS override работает только с spoofdpi." : "DNS override is available only with spoofdpi." }
 
     var descSystemProxy: String { isRussian ? "Использовать системный прокси" : "Use system-wide proxy" }
+    var systemProxyModeHelp: String { isRussian ? "Включает прокси только для текущего подключения после проверки доступа к интернету. При остановке прежние настройки вернутся." : "Enables the proxy for the current connection after checking internet access. Previous settings return when stopped." }
+    var systemProxyConflict: String { isRussian ? "У текущего подключения уже есть прокси. Выключи его или используй локальный режим." : "The current connection already has a proxy. Turn it off or use local mode." }
+    var systemProxyUnavailable: String { isRussian ? "Не удалось определить текущее сетевое подключение. Системный прокси не включён." : "The current network connection could not be identified. System proxy was not enabled." }
+    var systemProxyApplyFailed: String { isRussian ? "Не удалось применить системный прокси. Проверь настройки сети." : "Could not apply the system proxy. Check network settings." }
+    var proxyConnectivityFailed: String { isRussian ? "Локальный прокси не прошёл проверку доступа к интернету. Системные настройки не изменены." : "The local proxy failed the internet check. System settings were not changed." }
     var descSilent: String { isRussian ? "Скрыть баннер при запуске" : "Suppress startup banner" }
     var descIpv4Only: String { isRussian ? "Только IPv4 для DNS" : "IPv4 only for DNS" }
     var descDebug: String { isRussian ? "Режим отладки (info/debug)" : "Debug mode (info/debug)" }

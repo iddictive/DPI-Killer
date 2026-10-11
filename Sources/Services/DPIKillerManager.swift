@@ -104,7 +104,6 @@ final class DPIKillerManager {
         if isRunning {
             stop()
         }
-        killOrphans()
         isRunning = false
         didBecomeReady = false
         wasRunningBeforeDisconnect = true
@@ -117,9 +116,6 @@ final class DPIKillerManager {
         guard FileManager.default.fileExists(atPath: binaryPath) else {
             completion(false, "NOT_INSTALLED")
             return
-        }
-        if SettingsStore.shared.disableIpv6 {
-            SettingsStore.shared.applyIpv6Preference()
         }
         guard let port = availableLocalPort(preferredPort: preferredPort) else {
             completion(false, L10n.shared.noAvailableLocalPort)
@@ -243,15 +239,29 @@ final class DPIKillerManager {
                         return
                     }
 
-                    self.isRunning = true
-                    self.activePort = port
-                    self.didBecomeReady = true
-                    if forceSystemProxy || (SettingsStore.shared.usesSystemProxy && !SettingsStore.shared.vpnModeEnabled) {
-                        self.enableSystemProxy(for: engine, port: port)
+                    self.maintenanceQueue.async { [weak self] in
+                        guard let self else { return }
+                        let passes = self.proxyPassesInternetCheck(engine: engine, port: port)
+                        DispatchQueue.main.async {
+                            guard self.process === process, process.isRunning else {
+                                completion(false, L10n.shared.backendExitedEarly)
+                                return
+                            }
+                            guard passes else {
+                                self.stop()
+                                completion(false, L10n.shared.proxyConnectivityFailed)
+                                return
+                            }
+                            if forceSystemProxy || SettingsStore.shared.usesSystemProxy {
+                                if let error = SystemProxyController.shared.apply(mode: engine.proxyMode, port: port) {
+                                    self.stop()
+                                    completion(false, error)
+                                    return
+                                }
+                            }
+                            self.markBackendReady(port: port, completion: completion)
+                        }
                     }
-                    self.startWatchdog()
-                    completion(true, nil)
-                    (NSApp.delegate as? AppDelegate)?.refreshUI()
                 }
             }
         } catch {
@@ -291,6 +301,34 @@ final class DPIKillerManager {
         installProcess = nil
     }
 
+    private func markBackendReady(port: Int, completion: @escaping (Bool, String?) -> Void) {
+        isRunning = true
+        activePort = port
+        didBecomeReady = true
+        startWatchdog()
+        completion(true, nil)
+        (NSApp.delegate as? AppDelegate)?.refreshUI()
+    }
+
+    private func proxyPassesInternetCheck(engine: BypassEngine, port: Int) -> Bool {
+        let proxy = "\(engine.proxyMode == .socks ? "socks5h" : "http")://127.0.0.1:\(port)"
+        for url in ["https://www.apple.com/library/test/success.html", "https://www.cloudflare.com/cdn-cgi/trace"] {
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/curl")
+            task.arguments = ["--silent", "--show-error", "--fail", "--location", "--connect-timeout", "3", "--max-time", "7", "--noproxy", "", "--proxy", proxy, "--output", "/dev/null", url]
+            task.standardOutput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+            do {
+                try task.run()
+                task.waitUntilExit()
+                if task.terminationStatus == 0 { return true }
+            } catch {
+                AppLogger.log("[Manager] Proxy check could not start: \(error.localizedDescription)")
+            }
+        }
+        return false
+    }
+
     func stop() {
         isRunning = false
         didBecomeReady = false
@@ -305,11 +343,10 @@ final class DPIKillerManager {
         stopWatchdog()
         outputPipe?.fileHandleForReading.readabilityHandler = nil
         outputPipe = nil
+        disableSystemProxy()
         process?.terminate()
         process = nil
         stopDualProcesses()
-        killOrphans()
-        disableSystemProxy()
         (NSApp.delegate as? AppDelegate)?.refreshUI()
     }
 
@@ -324,15 +361,12 @@ final class DPIKillerManager {
 
         AppLogger.log("[Manager] Performing full cleanup...")
         stop()
-        SettingsStore.shared.restoreIpv6Defaults()
     }
 
     func recoverEnvironment(completion: (() -> Void)? = nil) {
         maintenanceQueue.async {
             AppLogger.log("[Manager] Recovering environment after previous run...")
-            self.killOrphans()
             self.disableSystemProxy()
-            SettingsStore.shared.restoreIpv6Defaults()
             DispatchQueue.main.async {
                 completion?()
             }
@@ -427,6 +461,7 @@ final class DPIKillerManager {
         highCpuStrikes = 0
         stopWatchdog()
         internalRestartInProgress = true
+        disableSystemProxy()
         process?.terminate()
         process = nil
         stopDualProcesses()
@@ -454,12 +489,12 @@ final class DPIKillerManager {
         internalRestartInProgress = true
         outputPipe?.fileHandleForReading.readabilityHandler = nil
         outputPipe = nil
+        disableSystemProxy()
         process?.terminate()
         process = nil
         stopDualProcesses()
         isRunning = false
         killOrphans()
-        disableSystemProxy()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             guard let self, self.wasRunningBeforeDisconnect else { return }
@@ -536,11 +571,14 @@ final class DPIKillerManager {
         maintenanceQueue.async { [weak self] in
             guard let self else { return }
             let reachable = self.isLocalPortReachable(port: port)
+            let internetWorks = !SystemProxyController.shared.hasLease
+                || (reachable && self.proxyPassesInternetCheck(engine: self.currentEngine, port: port))
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.isRunning, self.didBecomeReady, self.activePort == port else { return }
                 let alive = self.process?.isRunning ?? false
-                guard !alive || !reachable else { return }
-                AppLogger.log("[Watchdog] Backend not serving (process alive: \(alive), port reachable: \(reachable)). Recycling...")
+                guard !alive || !reachable || !internetWorks else { return }
+                AppLogger.log("[Watchdog] Backend not serving (process alive: \(alive), port reachable: \(reachable), internet works: \(internetWorks)). Recycling...")
+                self.disableSystemProxy()
                 self.process?.terminate()
                 self.resetBackendState()
                 (NSApp.delegate as? AppDelegate)?.refreshUI()
@@ -550,57 +588,16 @@ final class DPIKillerManager {
     }
 
     private func killOrphans() {
-        for processName in Set(currentEngine.processNames + BypassEngine.ciadpi.processNames + BypassEngine.spoofdpi.processNames) {
-            let killer = Process()
-            killer.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-            killer.arguments = ["-9", processName]
-            try? killer.run()
-            killer.waitUntilExit()
-        }
-    }
-
-    private func enableSystemProxy(for engine: BypassEngine, port: Int) {
-        SettingsStore.shared.lastAppliedSystemProxyPort = port
-        let script: String
-        switch engine.proxyMode {
-        case .http:
-            script = """
-            services=$(networksetup -listallnetworkservices | grep -v '^An asterisk' | grep -v '^\\*$');
-            while IFS= read -r service; do
-              [ -z "$service" ] && continue
-              networksetup -setwebproxy "$service" 127.0.0.1 \(port) off 2>/dev/null
-              networksetup -setsecurewebproxy "$service" 127.0.0.1 \(port) off 2>/dev/null
-              networksetup -setwebproxystate "$service" on 2>/dev/null
-              networksetup -setsecurewebproxystate "$service" on 2>/dev/null
-              networksetup -setsocksfirewallproxystate "$service" off 2>/dev/null
-            done <<< "$services"
-            """
-        case .socks:
-            script = """
-            services=$(networksetup -listallnetworkservices | grep -v '^An asterisk' | grep -v '^\\*$');
-            while IFS= read -r service; do
-              [ -z "$service" ] && continue
-              networksetup -setsocksfirewallproxy "$service" 127.0.0.1 \(port) off 2>/dev/null
-              networksetup -setsocksfirewallproxystate "$service" on 2>/dev/null
-              networksetup -setwebproxystate "$service" off 2>/dev/null
-              networksetup -setsecurewebproxystate "$service" off 2>/dev/null
-            done <<< "$services"
-            """
-        }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        process.arguments = ["-c", script]
-        try? process.run()
-        process.waitUntilExit()
+        // Only processes started by this instance are terminated via Process.
     }
 
     func disableSystemProxy() {
+        if !SystemProxyController.shared.restore() {
+            AppLogger.log("[Manager] Failed to restore the saved system proxy configuration.")
+        }
         let candidatePorts = Set([
-            activePort,
-            activeCiadpiPort,
             SettingsStore.shared.lastAppliedSystemProxyPort,
-            SettingsStore.shared.lastAppliedDualCiadpiPort,
-            preferredLocalPort()
+            SettingsStore.shared.lastAppliedDualCiadpiPort
         ].compactMap { $0 })
         let ports = candidatePorts.map(String.init).joined(separator: " ")
         guard !ports.isEmpty else { return }

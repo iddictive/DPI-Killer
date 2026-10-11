@@ -50,18 +50,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        if loadingWindow == nil {
-            loadingWindow = LoadingWindowController()
-        }
-        loadingWindow?.updateStatus(L10n.shared.preparingBypass)
-        loadingWindow?.showWithFade()
-
-        DPIKillerManager.shared.recoverEnvironment { [weak self] in
+        DPIKillerManager.shared.recoverEnvironment {
             if !CommandLine.arguments.contains("--skip-update-check") {
                 GitHubUpdater.shared.checkForUpdates()
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self?.attemptStart()
             }
         }
     }
@@ -209,13 +200,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func applyNetworkOptimization() {
-        SettingsStore.shared.applyMobileHotspotPreset()
         SettingsStore.shared.applyNetworkOptimization { [weak self] success, error in
             guard let self else { return }
             if success {
-                if self.isModeRunning() {
-                    self.restartRuntime()
-                }
                 self.refreshUI()
                 return
             }
@@ -389,18 +376,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func currentRuntimeStatus() -> RuntimeStatus {
-        if SettingsStore.shared.vpnModeEnabled {
-            if TunnelManager.shared.status == .connected, DPIKillerManager.shared.isRunning {
-                return .runningOptimized
-            }
-            if DPIKillerManager.shared.isRunning || TunnelManager.shared.isActive {
-                return .runningUnoptimized
-            }
-            return .stopped
-        }
-
         guard DPIKillerManager.shared.isRunning else { return .stopped }
-        return SettingsStore.shared.isNetworkOptimizationApplied() ? .runningOptimized : .runningUnoptimized
+        return .runningOptimized
     }
 
     func restartRuntime() {
@@ -414,58 +391,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func isModeRunning() -> Bool {
-        SettingsStore.shared.vpnModeEnabled ? TunnelManager.shared.isActive || DPIKillerManager.shared.isRunning : DPIKillerManager.shared.isRunning
+        DPIKillerManager.shared.isRunning
     }
 
     private func startSelectedMode(completion: @escaping (Bool, String?) -> Void) {
-        if SettingsStore.shared.vpnModeEnabled {
-            if let issue = SystemExtensionManager.shared.availabilityIssue() {
-                AppLogger.log("[App] VPN mode is unavailable for this build. Disabling the toggle and starting in proxy mode.")
-                SettingsStore.shared.vpnModeEnabled = false
-                DPIKillerManager.shared.start { success, error in
-                    completion(success, error ?? issue)
-                }
-                return
-            }
-
-            SystemExtensionManager.shared.ensureActivated { activated, activationIssue, disableToggle in
-                if !activated {
-                    if disableToggle {
-                        SettingsStore.shared.vpnModeEnabled = false
-                    }
-                    AppLogger.log("[App] System extension is not active. Starting in proxy mode.")
-                    DPIKillerManager.shared.start { success, error in
-                        completion(success, error ?? activationIssue)
-                    }
-                    return
-                }
-
-                DPIKillerManager.shared.start { success, error in
-                    guard success else {
-                        completion(false, error)
-                        return
-                    }
-                    TunnelManager.shared.start { tunnelSuccess, tunnelError in
-                        if !tunnelSuccess {
-                            AppLogger.log("[App] VPN mode start failed. Falling back to system proxy mode.")
-                            DPIKillerManager.shared.stop()
-                            DPIKillerManager.shared.startProxyFallback { fallbackSuccess, fallbackError in
-                                if fallbackSuccess {
-                                    AppLogger.log("[App] Proxy fallback is active.")
-                                    completion(true, nil)
-                                } else {
-                                    completion(false, tunnelError ?? fallbackError)
-                                }
-                            }
-                            return
-                        }
-                        completion(true, nil)
-                    }
-                }
-            }
-        } else {
-            DPIKillerManager.shared.start(completion: completion)
-        }
+        DPIKillerManager.shared.start(completion: completion)
     }
 
     private func statusTitle(for status: RuntimeStatus) -> String {

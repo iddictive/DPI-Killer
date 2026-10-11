@@ -74,7 +74,7 @@ struct BackendCapability {
                 supportsDNS: false,
                 supportsChunkSize: false,
                 supportsSpoofdpiUpdate: false,
-                supportedFlags: ["--system-proxy", "--policy-auto"]
+                supportedFlags: ["--policy-auto"]
             )
         case .spoofdpi:
             return BackendCapability(
@@ -83,7 +83,7 @@ struct BackendCapability {
                 supportsDNS: true,
                 supportsChunkSize: true,
                 supportsSpoofdpiUpdate: true,
-                supportedFlags: ["--system-proxy", "--silent", "--dns-ipv4-only", "--debug"]
+                supportedFlags: ["--dns-ipv4-only", "--debug"]
             )
         }
     }
@@ -104,6 +104,7 @@ struct CommonSettings {
     var autoDownload: Bool
     var disableIpv6: Bool
     var autoReconnect: Bool
+    var systemProxyEnabled: Bool
     var vpnClientCompatibilityEnabled: Bool
     var vpnModeEnabled: Bool
 }

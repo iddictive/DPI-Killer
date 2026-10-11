@@ -7,6 +7,7 @@
 /SpoofController.app/
 /SpoofController
 /DPIKiller.app/
+/.build.noindex/
 
 # Swift Package Manager
 /.build/

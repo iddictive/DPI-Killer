@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
-APP_NAME="DPIKiller.app"
+APP_NAME=".build.noindex/DPIKiller.app"
 OUTPUT_APP="${DPIKILLER_LOCAL_SIGNED_APP:-/tmp/DPIKiller-local-signed.app}"
 SIGNING_IDENTITY="${DPIKILLER_SIGNING_IDENTITY:-}"
 

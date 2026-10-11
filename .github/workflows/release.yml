@@ -39,14 +39,14 @@ jobs:
         run: |
           DPIKILLER_VERSION="$APP_VERSION" SKIP_VERSION_BUMP=1 bash build.sh
 
-          APP_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "DPIKiller.app/Contents/Info.plist")
+          APP_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" ".build.noindex/DPIKiller.app/Contents/Info.plist")
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
           echo "VERSION=$APP_VERSION" >> $GITHUB_OUTPUT
 
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $APP_VERSION" "DPIKiller.app/Contents/Info.plist" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_VERSION" "DPIKiller.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $APP_VERSION" ".build.noindex/DPIKiller.app/Contents/Info.plist" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_VERSION" ".build.noindex/DPIKiller.app/Contents/Info.plist"
 
           # Re-sign after plist modification
-          codesign --force --deep --sign - DPIKiller.app
+          codesign --force --deep --sign - .build.noindex/DPIKiller.app
 
       - name: Create DMG
         run: |

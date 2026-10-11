@@ -1,7 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 APP_NAME="DPIKiller"
-APP_BUNDLE="${APP_NAME}.app"
+APP_BUNDLE_NAME="${APP_NAME}.app"
+APP_BUNDLE=".build.noindex/${APP_BUNDLE_NAME}"
 DERIVED_DATA_DIR=".xcodebuild"
 DERIVED_DATA_DIR="${DPIKILLER_DERIVED_DATA_DIR:-$DERIVED_DATA_DIR}"
 
@@ -21,6 +22,7 @@ if [ -z "${DPIKILLER_VERSION:-}" ]; then
 fi
 FULL_VERSION="$(resolve_dpikiller_version "Info.plist")"
 
+mkdir -p .build.noindex
 rm -rf "${APP_BUNDLE}"
 rm -rf "${DERIVED_DATA_DIR}"
 
@@ -57,7 +59,7 @@ if command -v xcodegen >/dev/null 2>&1 && [ -f "project.yml" ]; then
 
     xcodebuild "${xcodebuild_args[@]}" build >/dev/null
 
-    cp -R "${DERIVED_DATA_DIR}/Build/Products/Release/${APP_BUNDLE}" "${APP_BUNDLE}"
+    cp -R "${DERIVED_DATA_DIR}/Build/Products/Release/${APP_BUNDLE_NAME}" "${APP_BUNDLE}"
 
     embedded_appex="${APP_BUNDLE}/Contents/PlugIns/DPIKillerTunnel.appex"
     if [ -d "${embedded_appex}" ]; then
