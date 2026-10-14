@@ -63,6 +63,10 @@ final class SettingsWindowController: NSWindowController {
         window?.level = .normal
     }
 
+    func refreshRuntimeStatus() {
+        model.refreshRuntimeStatus()
+    }
+
     private func enforceFixedWindowSize(center: Bool) {
         guard let window else { return }
         let frameSize = (window as? FixedSizeWindow)?.fixedFrameSize
@@ -84,12 +88,6 @@ final class SettingsWindowController: NSWindowController {
     private func setupSwiftUI() {
         let rootView = SettingsView(viewModel: model, onCancel: { [weak self] in
             self?.window?.close()
-        }, onSave: { [weak self] in
-            guard let self else { return }
-            if DPIKillerManager.shared.isRunning {
-                (NSApp.delegate as? AppDelegate)?.restartRuntime()
-            }
-            self.window?.close()
         })
         let hostingController = NSHostingController(rootView: rootView)
         self.hostingController = hostingController

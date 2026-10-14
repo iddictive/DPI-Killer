@@ -131,6 +131,25 @@ final class LogStore {
 }
 
 enum AppLogger {
+    static func safeArguments(_ arguments: [String]) -> String {
+        var hideNext = false
+        return arguments.map { argument in
+            if hideNext { hideNext = false; return "<redacted>" }
+            let key = argument.split(separator: "=", maxSplits: 1).first.map(String.init) ?? argument
+            if ["password", "token", "secret", "auth", "credential"].contains(where: { key.lowercased().contains($0) }) {
+                hideNext = !argument.contains("=")
+                return key + (argument.contains("=") ? "=<redacted>" : "")
+            }
+            if var url = URLComponents(string: argument), url.host != nil {
+                url.user = nil
+                url.password = nil
+                url.query = url.query == nil ? nil : "<redacted>"
+                return url.string ?? "<redacted URL>"
+            }
+            return argument
+        }.joined(separator: " ")
+    }
+
     static func log(_ message: String) {
         LogStore.shared.append(message)
         NSLog("%@", message)

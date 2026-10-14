@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 enum DPISettingsTokens {
@@ -202,11 +203,6 @@ struct SettingsRow<Content: View>: View {
 
 struct SettingsFooter: View {
     let statusText: String?
-    let canSave: Bool
-    let cancelTitle: String
-    let saveTitle: String
-    let onCancel: () -> Void
-    let onSave: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -215,18 +211,11 @@ struct SettingsFooter: View {
                     .font(DPISettingsTokens.captionFont)
                     .foregroundStyle(DPISettingsTokens.secondaryText)
                     .lineLimit(1)
+                    .help(statusText)
             }
 
             Spacer(minLength: 12)
 
-            Button(cancelTitle, action: onCancel)
-                .buttonStyle(.bordered)
-                .keyboardShortcut(.cancelAction)
-
-            Button(saveTitle, action: onSave)
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
-                .disabled(!canSave)
         }
         .padding(.horizontal, 14)
         .frame(height: DPISettingsTokens.footerHeight)
@@ -238,16 +227,13 @@ struct SettingsView: View {
     @StateObject private var viewModel: SettingsViewModel
 
     private let onCancel: (() -> Void)?
-    private let onSave: (() -> Void)?
 
     init(
         viewModel: SettingsViewModel = SettingsViewModel(),
-        onCancel: (() -> Void)? = nil,
-        onSave: (() -> Void)? = nil
+        onCancel: (() -> Void)? = nil
     ) {
         _viewModel = StateObject(wrappedValue: viewModel)
         self.onCancel = onCancel
-        self.onSave = onSave
     }
 
     var body: some View {
@@ -267,6 +253,7 @@ struct SettingsView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: DPISettingsTokens.cardSpacing) {
                         tabContent
+                            .disabled(viewModel.isApplyingSettings)
                     }
                     .id(viewModel.selectedTab)
                     .padding(DPISettingsTokens.contentPadding)
@@ -278,17 +265,16 @@ struct SettingsView: View {
             Divider()
 
             SettingsFooter(
-                statusText: viewModel.footerStatusText,
-                canSave: viewModel.canSave,
-                cancelTitle: L10n.shared.cancel,
-                saveTitle: viewModel.backendRunning ? L10n.shared.saveAndRestart : text(ru: "Сохранить", en: "Save"),
-                onCancel: cancel,
-                onSave: save
+                statusText: viewModel.footerStatusText
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(SettingsMaterialBackground().ignoresSafeArea())
         .ignoresSafeArea(.container, edges: .top)
+        .onExitCommand {
+            viewModel.save()
+            cancel()
+        }
         .onAppear {
             viewModel.refreshRuntimeStatus()
             viewModel.refreshEngineVersionsIfNeeded()
@@ -386,11 +372,12 @@ struct SettingsView: View {
                     Spacer(minLength: 0)
                     if viewModel.isApplyingNetworkOptimization {
                         ProgressView().controlSize(.small)
-                    } else if viewModel.needsNetworkOptimization {
-                        Button(text(ru: "Оптимизировать", en: "Optimize")) {
+                    } else {
+                        Button(text(ru: "Оптимизация сети", en: "Optimize Network")) {
                             viewModel.applyNetworkOptimization()
                         }
                         .buttonStyle(.bordered)
+                        .disabled(!viewModel.needsNetworkOptimization)
                         .help(text(ru: "Установить TTL 65 для раздачи интернета. macOS запросит пароль администратора.", en: "Set TTL to 65 for hotspot use. macOS will request administrator access."))
                     }
                 }
@@ -404,16 +391,18 @@ struct SettingsView: View {
         ) {
             SettingsRow(text(ru: "Пресет", en: "Preset")) {
                 Picker("", selection: $viewModel.selectedPreset) {
+                    Text(text(ru: "Свои настройки", en: "Custom settings")).tag(Optional<SettingsPreset>.none)
                     ForEach(SettingsPreset.allCases) { preset in
-                        Text(preset.title).tag(preset)
+                        Text(preset.title).tag(Optional(preset))
                     }
                 }
-                .pickerStyle(.segmented)
+                .pickerStyle(.menu)
                 .labelsHidden()
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .onChange(of: viewModel.selectedPreset) { preset in
-                    viewModel.applyPreset(preset)
-                }
+                Text(viewModel.presetSummary)
+                    .font(DPISettingsTokens.captionFont)
+                    .foregroundStyle(DPISettingsTokens.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Divider()
@@ -688,11 +677,6 @@ struct SettingsView: View {
         }
     }
 
-    private func save() {
-        viewModel.save()
-        onSave?()
-    }
-
     private func cancel() {
         if let onCancel {
             onCancel()
@@ -715,7 +699,21 @@ struct SettingsArgumentOption: Identifiable {
 
 final class SettingsViewModel: ObservableObject {
     @Published var selectedTab: SettingsTab = .backend
-    @Published var selectedPreset: SettingsPreset = .balanced
+    var selectedPreset: SettingsPreset? {
+        get {
+            SettingsPreset.allCases.first {
+                let values = $0.parameters
+                return defaultTTL == values.ttl && splitMode == values.split
+                    && httpsDisorder == values.disorder && httpsFakeCount == values.fakes && httpsChunkSize == values.chunk
+            }
+        }
+        set { if let newValue { applyPreset(newValue) } }
+    }
+
+    var presetSummary: String {
+        selectedPreset?.summary(for: resolvedEngine)
+            ?? text(ru: "Параметры изменены вручную и не совпадают с пресетом.", en: "These parameters were changed manually and do not match a preset.")
+    }
     @Published var backendSelection: BackendSelection
     @Published var customBinaryPath: String
     @Published var defaultTTL: String
@@ -772,6 +770,10 @@ final class SettingsViewModel: ObservableObject {
     private let store: SettingsStore
     private let updater: SpoofdpiUpdater
     private let ciadpiUpdater: CiadpiUpdater
+    private var settingsObservation: AnyCancellable?
+    private var pendingApply: DispatchWorkItem?
+    private var lastAppliedDraft: SettingsDraft
+    @Published private(set) var isApplyingSettings = false
 
     init(
         store: SettingsStore = .shared,
@@ -785,6 +787,7 @@ final class SettingsViewModel: ObservableObject {
         self.ciadpiUpdater = ciadpiUpdater
 
         let draft = store.loadDraft()
+        lastAppliedDraft = draft
         backendSelection = draft.backendSelection
         customBinaryPath = draft.customPath
         defaultTTL = draft.common.defaultTTL
@@ -823,6 +826,9 @@ final class SettingsViewModel: ObservableObject {
 
         refreshCiadpiLocalStatus()
         refreshSpoofdpiLocalStatus()
+        settingsObservation = objectWillChange.sink { [weak self] _ in
+            self?.scheduleApply()
+        }
     }
 
     var resolvedBinaryPath: String {
@@ -1117,34 +1123,18 @@ final class SettingsViewModel: ObservableObject {
     }
 
     func applyMobilePreset() {
-        selectedPreset = .hotspot
         applyPreset(.hotspot)
         save()
         applyNetworkOptimization()
     }
 
     func applyPreset(_ preset: SettingsPreset) {
-        switch preset {
-        case .balanced:
-            defaultTTL = "128"
-            splitMode = "random"
-            httpsDisorder = true
-            httpsFakeCount = "0"
-            httpsChunkSize = "20"
-        case .hotspot:
-            defaultTTL = "65"
-            splitMode = "random"
-            httpsDisorder = true
-            httpsFakeCount = "0"
-            httpsChunkSize = "20"
-        case .conservative:
-            defaultTTL = "128"
-            splitMode = "sni"
-            httpsDisorder = false
-            httpsFakeCount = "0"
-            httpsChunkSize = "20"
-        }
-        footerStatus = text(ru: "\(preset.title) применён.", en: "\(preset.title) applied.")
+        let values = preset.parameters
+        defaultTTL = values.ttl
+        splitMode = values.split
+        httpsDisorder = values.disorder
+        httpsFakeCount = values.fakes
+        httpsChunkSize = values.chunk
     }
 
     func refreshRuntimeStatus() {
@@ -1196,7 +1186,6 @@ final class SettingsViewModel: ObservableObject {
         vpnModeEnabled = false
         flagsByEngine[.ciadpi]?.remove("--system-proxy")
         flagsByEngine[.spoofdpi]?.remove("--system-proxy")
-        save()
 
         let openImport: (Bool, String?) -> Void = { [weak self] success, error in
             DispatchQueue.main.async {
@@ -1216,19 +1205,12 @@ final class SettingsViewModel: ObservableObject {
             }
         }
 
-        if DPIKillerManager.shared.isRunning || TunnelManager.shared.isActive {
-            TunnelManager.shared.stop()
-            DPIKillerManager.shared.stop()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                DPIKillerManager.shared.start { success, error in
-                    openImport(success, error)
-                    (NSApp.delegate as? AppDelegate)?.refreshUI()
-                }
-            }
-        } else {
-            DPIKillerManager.shared.start { success, error in
-                openImport(success, error)
-                (NSApp.delegate as? AppDelegate)?.refreshUI()
+        save { success, error in
+            guard success else { openImport(false, error); return }
+            if DPIKillerManager.shared.isRunning {
+                openImport(true, nil)
+            } else {
+                DPIKillerManager.shared.start(completion: openImport)
             }
         }
     }
@@ -1375,14 +1357,8 @@ final class SettingsViewModel: ObservableObject {
         }
     }
 
-    func save() {
-        guard canSave else { return }
+    private func settingsDraft() -> SettingsDraft {
         let sanitizedVPNClientCompatibility = vpnClientCompatibilityEnabled
-        if sanitizedVPNClientCompatibility {
-            vpnModeEnabled = false
-            flagsByEngine[.ciadpi]?.remove("--system-proxy")
-            flagsByEngine[.spoofdpi]?.remove("--system-proxy")
-        }
         let sanitizedCommon = CommonSettings(
             localPort: String(clamp(localPort, defaultValue: 8080, range: 1...65535)),
             defaultTTL: String(clamp(defaultTTL, defaultValue: 64, range: 1...255)),
@@ -1402,7 +1378,7 @@ final class SettingsViewModel: ObservableObject {
             vpnClientCompatibilityEnabled: sanitizedVPNClientCompatibility,
             vpnModeEnabled: vpnModeEnabled && vpnAvailable && !sanitizedVPNClientCompatibility
         )
-        let draft = SettingsDraft(
+        return SettingsDraft(
             backendSelection: backendSelection,
             customPath: customBinaryPath,
             common: sanitizedCommon,
@@ -1415,20 +1391,98 @@ final class SettingsViewModel: ObservableObject {
                 manualArgs: spoofdpiManualArgs
             )
         )
-        store.saveDraft(draft)
+    }
 
-        localPort = sanitizedCommon.localPort
-        defaultTTL = sanitizedCommon.defaultTTL
-        httpsFakeCount = sanitizedCommon.httpsFakeCount
-        httpsChunkSize = sanitizedCommon.httpsChunkSize
-        dnsAddr = sanitizedCommon.dnsAddr
-        dnsMode = sanitizedCommon.dnsMode
-        dnsHttpsUrl = sanitizedCommon.dnsHttpsUrl
-        vpnClientCompatibilityEnabled = sanitizedCommon.vpnClientCompatibilityEnabled
-        vpnModeEnabled = sanitizedCommon.vpnModeEnabled
-        refreshSpoofdpiLocalStatus()
-        refreshRuntimeStatus()
-        footerStatus = text(ru: "Настройки сохранены.", en: "Settings saved.")
+    private func scheduleApply() {
+        pendingApply?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.applySettings() }
+        pendingApply = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+    }
+
+    func save(completion: ((Bool, String?) -> Void)? = nil) {
+        pendingApply?.cancel()
+        applySettings(completion: completion)
+    }
+
+    private func applySettings(completion: ((Bool, String?) -> Void)? = nil) {
+        guard !isApplyingSettings, canSave else { completion?(false, validationIssue); return }
+        let requested = settingsDraft()
+        guard requested != lastAppliedDraft else { completion?(true, nil); return }
+        let previous = store.loadDraft()
+        let oldCommand = store.commandPreview()
+        let wasRunning = DPIKillerManager.shared.isRunning || DPIKillerManager.shared.process?.isRunning == true
+        store.saveDraft(requested)
+        let saved = store.loadDraft()
+        let restart = oldCommand != store.commandPreview()
+        isApplyingSettings = true
+        footerStatus = text(ru: "Применяю настройки…", en: "Applying settings…")
+        AppLogger.log("[Settings] Applying: engine=\(store.currentEngine().rawValue), systemProxy=\(store.usesSystemProxy), backendActive=\(wasRunning), restart=\(restart).")
+
+        let finish: (Bool, String?) -> Void = { [weak self] success, error in
+            guard let self else { return }
+            if success {
+                self.lastAppliedDraft = saved
+                if self.settingsDraft() == requested { self.restoreDraft(saved) }
+                self.footerStatus = DPIKillerManager.shared.isRunning
+                    ? self.text(ru: "Настройки применены.", en: "Settings applied.")
+                    : self.text(ru: "Настройки сохранены. Движок выключен.", en: "Settings saved. Backend is stopped.")
+                AppLogger.log("[Settings] Applied successfully. backendActive=\(DPIKillerManager.shared.isRunning).")
+            } else {
+                self.lastAppliedDraft = previous
+                self.store.saveDraft(previous)
+                if self.settingsDraft() == requested { self.restoreDraft(previous) }
+                self.footerStatus = error ?? self.text(ru: "Не удалось применить настройки.", en: "Could not apply settings.")
+                AppLogger.log("[Settings] Apply failed: \(error ?? "unknown"). Previous settings restored.")
+            }
+            self.isApplyingSettings = false
+            self.refreshRuntimeStatus()
+            self.scheduleApply()
+            completion?(success && error != DPIKillerManager.settingsChangeCancelled, error)
+        }
+        guard wasRunning else { finish(true, nil); return }
+        DPIKillerManager.shared.reconfigure(restartBackend: restart) { success, error in
+            if error == DPIKillerManager.settingsChangeCancelled {
+                finish(true, error)
+                return
+            }
+            self.store.saveDraft(success ? saved : previous)
+            if success || DPIKillerManager.shared.matchesConfiguredBackend {
+                finish(success, error)
+                return
+            }
+            self.store.saveDraft(previous)
+            AppLogger.log("[Settings] Recovering previous working backend after failed change.")
+            DPIKillerManager.shared.start { recovered, recoveryError in
+                if !recovered { AppLogger.log("[Settings] Previous backend recovery failed: \(recoveryError ?? "unknown").") }
+                finish(false, error ?? recoveryError)
+            }
+        }
+    }
+
+    private func restoreDraft(_ draft: SettingsDraft) {
+        backendSelection = draft.backendSelection
+        customBinaryPath = draft.customPath
+        localPort = draft.common.localPort
+        defaultTTL = draft.common.defaultTTL
+        splitMode = draft.common.splitMode
+        httpsDisorder = draft.common.httpsDisorder
+        httpsFakeCount = draft.common.httpsFakeCount
+        httpsChunkSize = draft.common.httpsChunkSize
+        dnsAddr = draft.common.dnsAddr
+        dnsMode = draft.common.dnsMode
+        dnsHttpsUrl = draft.common.dnsHttpsUrl
+        launchAtLogin = draft.common.launchAtLogin
+        autoUpdate = draft.common.autoUpdate
+        autoDownload = draft.common.autoDownload
+        disableIpv6 = draft.common.disableIpv6
+        autoReconnect = draft.common.autoReconnect
+        systemProxyEnabled = draft.common.systemProxyEnabled
+        vpnClientCompatibilityEnabled = draft.common.vpnClientCompatibilityEnabled
+        vpnModeEnabled = draft.common.vpnModeEnabled
+        ciadpiManualArgs = draft.ciadpi.manualArgs
+        spoofdpiManualArgs = draft.spoofdpi.manualArgs
+        flagsByEngine = [.ciadpi: draft.ciadpi.selectedFlags, .spoofdpi: draft.spoofdpi.selectedFlags]
     }
 
     func manualWarning(for engine: BypassEngine) -> String? {
@@ -1454,7 +1508,7 @@ final class SettingsViewModel: ObservableObject {
         if backendSelection == .custom, customBinaryPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return text(ru: "Укажи путь к backend.", en: "Select a backend path.")
         }
-        if manualWarning(for: .ciadpi) != nil || manualWarning(for: .spoofdpi) != nil {
+        if manualWarning(for: resolvedEngine) != nil {
             return text(ru: "В Manual есть конфликтующие аргументы.", en: "Manual args contain incompatible flags.")
         }
         return nil
@@ -1483,121 +1537,7 @@ final class SettingsViewModel: ObservableObject {
     }
 
     private func buildLaunchArguments(for engine: BypassEngine, binaryPath: String) -> [String] {
-        let manualParts = argumentParts(from: manualArgs(for: engine))
-        let flags = selectedFlags(for: engine).intersection(BackendCapability.forEngine(engine).supportedFlags)
-        let port = clamp(localPort, defaultValue: 8080, range: 1...65535)
-        let ttlValue = clamp(defaultTTL, defaultValue: 64, range: 1...255)
-        let fakeCount = clamp(httpsFakeCount, defaultValue: 0, range: 0...100)
-        let chunkSize = clamp(httpsChunkSize, defaultValue: 20, range: 1...255)
-
-        switch engine {
-        case .spoofdpi:
-            var args: [String] = []
-            if spoofdpiSupportsHeadlessMode(binaryPath: binaryPath) {
-                args.append("--no-tui")
-            }
-            if flags.contains("--dns-ipv4-only") { args += ["--dns-qtype", "ipv4"] }
-            if flags.contains("--debug") { args += ["--log-level", "debug"] }
-            if !splitMode.isEmpty && splitMode != "sni" {
-                args += ["--https-split-mode", splitMode]
-            }
-            if httpsDisorder {
-                args.append("--https-disorder")
-            }
-            if fakeCount > 0 {
-                args += ["--https-fake-count", "\(fakeCount)"]
-            }
-            if chunkSize > 0 {
-                args += ["--https-chunk-size", "\(chunkSize)"]
-            }
-            args += ["--listen-addr", "127.0.0.1:\(port)"]
-
-            let spoofDNSMode = normalizedSpoofdpiDNSMode(dnsMode)
-            let trimmedDNS = dnsAddr.trimmingCharacters(in: .whitespacesAndNewlines)
-            if spoofDNSMode != "system", !trimmedDNS.isEmpty {
-                args += ["--dns-addr", trimmedDNS]
-            }
-            args += ["--dns-mode", spoofDNSMode]
-
-            let trimmedDoH = dnsHttpsUrl.trimmingCharacters(in: .whitespacesAndNewlines)
-            if spoofDNSMode == "https", !trimmedDoH.isEmpty {
-                args += ["--dns-https-url", trimmedDoH]
-            }
-            return args + manualParts
-        case .ciadpi:
-            var args: [String] = ["-p", "\(port)", "--def-ttl", "\(ttlValue)"]
-            if flags.contains("--policy-auto") {
-                args += ["--auto", "torst"]
-            }
-            switch splitMode {
-            case "sni":
-                args += ["--split", "1+s"]
-            case "chunk":
-                args += ["--tlsrec", "1+s"]
-            case "random":
-                if !args.contains("--auto") {
-                    args += ["--auto", "torst"]
-                }
-                args += ["--tlsrec", "1+s"]
-            default:
-                break
-            }
-            if httpsDisorder {
-                args += ["--disorder", "1"]
-            }
-            if let supported = store.ciadpiSupportedOptions(binaryPath: binaryPath) {
-                args = store.filteredCiadpiArgs(args, supported: supported)
-            }
-            return args + manualParts
-        }
-    }
-
-    private func normalizedSpoofdpiDNSMode(_ value: String) -> String {
-        switch value.trimmingCharacters(in: .whitespacesAndNewlines) {
-        case "", "udp":
-            return "udp"
-        case "https", "doh":
-            return "https"
-        case "system", "sys":
-            return "system"
-        default:
-            return "udp"
-        }
-    }
-
-    private func spoofdpiSupportsHeadlessMode(binaryPath: String) -> Bool {
-        guard FileManager.default.isExecutableFile(atPath: binaryPath) else { return false }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: binaryPath)
-        process.arguments = ["--version"]
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            guard let output = String(data: data, encoding: .utf8) else { return false }
-            let pattern = #"spoofdpi\s+(\d+)\.(\d+)\.(\d+)"#
-            guard let regex = try? NSRegularExpression(pattern: pattern),
-                  let match = regex.firstMatch(in: output, range: NSRange(output.startIndex..., in: output)),
-                  let majorRange = Range(match.range(at: 1), in: output),
-                  let minorRange = Range(match.range(at: 2), in: output),
-                  let major = Int(output[majorRange]),
-                  let minor = Int(output[minorRange]) else {
-                return false
-            }
-            return major > 1 || (major == 1 && minor >= 4)
-        } catch {
-            return false
-        }
-    }
-
-    private func argumentParts(from string: String) -> [String] {
-        string.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+        store.launchArguments(draft: settingsDraft(), binaryPath: binaryPath)
     }
 
     private func compactPath(_ path: String) -> String {

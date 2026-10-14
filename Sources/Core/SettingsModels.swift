@@ -89,7 +89,7 @@ struct BackendCapability {
     }
 }
 
-struct CommonSettings {
+struct CommonSettings: Equatable {
     var localPort: String
     var defaultTTL: String
     var splitMode: String
@@ -109,12 +109,12 @@ struct CommonSettings {
     var vpnModeEnabled: Bool
 }
 
-struct EngineSettings {
+struct EngineSettings: Equatable {
     var selectedFlags: Set<String>
     var manualArgs: String
 }
 
-struct SettingsDraft {
+struct SettingsDraft: Equatable {
     var backendSelection: BackendSelection
     var customPath: String
     var common: CommonSettings
@@ -137,6 +137,35 @@ enum SettingsPreset: String, CaseIterable, Identifiable {
     case conservative
 
     var id: String { rawValue }
+
+    var parameters: (ttl: String, split: String, disorder: Bool, fakes: String, chunk: String) {
+        switch self {
+        case .balanced: return ("128", "random", true, "0", "20")
+        case .hotspot: return ("65", "random", true, "0", "20")
+        case .conservative: return ("128", "sni", false, "0", "20")
+        }
+    }
+
+    func summary(for engine: BypassEngine) -> String {
+        let russian = L10n.shared.isRussian
+        let splitting: String
+        if self == .conservative {
+            splitting = russian ? "Разбиение HTTPS у SNI, обычный порядок фрагментов." : "Split HTTPS at SNI; send fragments in their original order."
+        } else {
+            if engine == .ciadpi {
+                splitting = russian ? "Адаптивное разбиение HTTPS, изменённый порядок фрагментов." : "Adaptive HTTPS splitting; send fragments out of order."
+            } else {
+                splitting = russian ? "Случайное разбиение HTTPS, изменённый порядок фрагментов." : "Random HTTPS splitting; send fragments out of order."
+            }
+        }
+        if engine == .ciadpi {
+            return splitting + (russian ? " TTL пакетов: \(parameters.ttl)." : " Packet TTL: \(parameters.ttl).")
+        }
+        if self != .conservative {
+            return splitting + (russian ? " В SpoofDPI Balanced и Hotspot одинаковы; TTL Mac меняется через оптимизацию сети." : "Balanced and Hotspot are identical in SpoofDPI; change Mac TTL with network optimization.")
+        }
+        return splitting
+    }
 
     var title: String {
         switch self {

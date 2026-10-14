@@ -65,6 +65,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DPIKillerManager.shared.fullCleanup()
     }
 
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard DPIKillerManager.shared.process?.isRunning == true || SystemProxyController.shared.hasLease else { return .terminateNow }
+        DPIKillerManager.shared.stopAsync { [weak self] success, error in
+            if !success { self?.showStartupFailureAlert(error: error) }
+            sender.reply(toApplicationShouldTerminate: success)
+        }
+        return .terminateLater
+    }
+
     func attemptStart() {
         startSelectedMode { [weak self] success, error in
             self?.loadingWindow?.closeWithFade {
@@ -112,6 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            self.settingsWindow?.refreshRuntimeStatus()
             if let button = self.statusItem?.button {
                 let runtimeStatus = self.currentRuntimeStatus()
                 if self.iconCache[runtimeStatus] == nil {
@@ -127,7 +137,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func toggle() {
         if isModeRunning() {
             TunnelManager.shared.stop()
-            DPIKillerManager.shared.stop()
+            DPIKillerManager.shared.stopAsync { [weak self] success, error in
+                if !success { self?.showStartupFailureAlert(error: error) }
+                self?.refreshUI()
+            }
         } else {
             startSelectedMode { [weak self] success, error in
                 if !success {
@@ -370,8 +383,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             signal(signalNumber, SIG_IGN)
             let source = DispatchSource.makeSignalSource(signal: signalNumber, queue: .main)
             source.setEventHandler {
-                DPIKillerManager.shared.fullCleanup()
-                exit(0)
+                DPIKillerManager.shared.stopAsync { success, error in
+                    if success {
+                        DPIKillerManager.shared.fullCleanup()
+                        exit(0)
+                    } else {
+                        AppLogger.log("[Manager] Exit cancelled: \(error ?? "proxy restoration failed").")
+                    }
+                }
             }
             source.resume()
             signalSources.append(source)
@@ -385,11 +404,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func restartRuntime() {
         TunnelManager.shared.stop()
-        DPIKillerManager.shared.stop()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.startSelectedMode { _, _ in
-                self?.refreshUI()
-            }
+        DPIKillerManager.shared.reconfigure(restartBackend: true) { [weak self] success, error in
+            if !success { self?.showStartupFailureAlert(error: error) }
+            self?.refreshUI()
         }
     }
 
@@ -424,7 +441,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return L10n.shared.runtimeModeProxyFallback
             }
         }
-        return SettingsStore.shared.usesSystemProxy ? L10n.shared.runtimeModeProxy : L10n.shared.runtimeModeLocalProxy
+        return SystemProxyController.shared.hasLease ? L10n.shared.runtimeModeProxy : L10n.shared.runtimeModeLocalProxy
     }
 
     private func backendRuntimeTitle() -> String {

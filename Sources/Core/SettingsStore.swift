@@ -262,7 +262,9 @@ final class SettingsStore {
 
         applyBackendSelection(draft.backendSelection, customPath: draft.customPath)
         localPort = clampedString(draft.common.localPort, defaultValue: 8080, range: 1...65535)
-        launchAtLogin = draft.common.launchAtLogin
+        if launchAtLogin != draft.common.launchAtLogin {
+            launchAtLogin = draft.common.launchAtLogin
+        }
         autoUpdate = draft.common.autoUpdate
         autoDownload = draft.common.autoDownload
         disableIpv6 = draft.common.disableIpv6
@@ -610,9 +612,25 @@ final class SettingsStore {
     }
 
     func launchArguments(for explicitPath: String? = nil, port portOverride: Int? = nil) -> [String] {
+        launchArguments(draft: loadDraft(), binaryPath: explicitPath ?? binaryPath, port: portOverride)
+    }
+
+    func launchArguments(draft: SettingsDraft, binaryPath: String, port portOverride: Int? = nil) -> [String] {
+        let common = draft.common
+        let localPort = common.localPort
+        let defaultTTL = common.defaultTTL
+        let splitMode = common.splitMode
+        let httpsDisorder = common.httpsDisorder
+        let httpsFakeCount = common.httpsFakeCount
+        let httpsChunkSize = common.httpsChunkSize
+        let dnsMode = common.dnsMode
+        let dnsAddr = common.dnsAddr
+        let dnsHttpsUrl = common.dnsHttpsUrl
+        let explicitPath: String? = binaryPath
         let engine = currentEngine(for: explicitPath)
-        let manualParts = argumentParts(from: manualArgsString(for: explicitPath))
-        let flags = selectedFlags(for: engine)
+        let settings = draft.engineSettings(for: engine)
+        let manualParts = argumentParts(from: settings.manualArgs)
+        let flags = settings.selectedFlags.intersection(BackendCapability.forEngine(engine).supportedFlags)
         let port = (portOverride ?? (Int(localPort.trimmingCharacters(in: .whitespaces)) ?? 8080)).clamped(to: 1...65535)
         let ttlValue = (Int(defaultTTL.trimmingCharacters(in: .whitespaces)) ?? 64).clamped(to: 1...255)
         let fakeCount = (Int(httpsFakeCount.trimmingCharacters(in: .whitespaces)) ?? 0).clamped(to: 0...100)

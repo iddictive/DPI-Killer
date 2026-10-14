@@ -13,6 +13,8 @@ final class DPIKillerManager {
     private let processCleanupQueue = DispatchQueue(label: "com.iddictive.dpikiller.process-cleanup", qos: .utility)
     private let stoppingBackends = DispatchGroup()
     private var lifecycleID = UUID()
+    private var userStopID = UUID()
+    static let settingsChangeCancelled = "SETTINGS_CHANGE_CANCELLED"
     private var restartWorkItem: DispatchWorkItem?
     private var servingFailureStrikes = 0
     private let cleanupLock = NSLock()
@@ -45,7 +47,14 @@ final class DPIKillerManager {
     private var dualRestarting: Set<BypassEngine> = []
 
     private var currentEngine: BypassEngine {
-        SettingsStore.shared.currentEngine()
+        SettingsStore.shared.currentEngine(for: process?.executableURL?.path)
+    }
+
+    var matchesConfiguredBackend: Bool {
+        guard let process, process.isRunning, let port = activePort else { return false }
+        let store = SettingsStore.shared
+        return process.executableURL?.path == store.binaryPath
+            && process.arguments == store.launchArguments(for: store.binaryPath, port: port)
     }
 
     var isUsingProxyFallback: Bool {
@@ -74,10 +83,10 @@ final class DPIKillerManager {
             }
             self.isConnectivityRestartInProgress = true
             DispatchQueue.main.async {
-                AppLogger.log("[Manager] Auto-restarting after network restoration...")
+                AppLogger.log("[Manager] Checking backend after network restoration...")
                 self.restartAfterConnectivityRestoration { success, error in
                     if success {
-                        AppLogger.log("[Manager] Auto-restart success.")
+                        AppLogger.log("[Manager] Network recovery completed.")
                     } else {
                         AppLogger.log("[Manager] Auto-restart failed: \(error ?? "unknown")")
                     }
@@ -102,16 +111,61 @@ final class DPIKillerManager {
         attemptedBPFRepair: Bool = false,
         completion: @escaping (Bool, String?) -> Void
     ) {
-        stop()
-        forceSystemProxyOverride = forceSystemProxy
-        wasRunningBeforeDisconnect = true
+        lifecycleID = UUID()
         let requestID = lifecycleID
-        stoppingBackends.notify(queue: .main) { [weak self] in
-            guard let self, self.lifecycleID == requestID, self.wasRunningBeforeDisconnect else {
-                completion(false, L10n.shared.backendExitedEarly)
-                return
+        maintenanceQueue.async {
+            let restored = self.disableSystemProxy()
+            let error = SystemProxyController.shared.lastError
+            DispatchQueue.main.async {
+                guard self.lifecycleID == requestID else {
+                    completion(false, Self.settingsChangeCancelled)
+                    return
+                }
+                guard restored, self.stop(userRequested: false) else {
+                    completion(false, error ?? SystemProxyController.shared.lastError)
+                    return
+                }
+                self.forceSystemProxyOverride = forceSystemProxy
+                self.wasRunningBeforeDisconnect = true
+                let launchID = self.lifecycleID
+                self.stoppingBackends.notify(queue: .main) {
+                    guard self.lifecycleID == launchID, self.wasRunningBeforeDisconnect else {
+                        completion(false, Self.settingsChangeCancelled)
+                        return
+                    }
+                    self.launch(forceSystemProxy: forceSystemProxy, attemptedBPFRepair: attemptedBPFRepair, completion: completion)
+                }
             }
-            self.launch(forceSystemProxy: forceSystemProxy, attemptedBPFRepair: attemptedBPFRepair, completion: completion)
+        }
+    }
+
+    func reconfigure(restartBackend: Bool, completion: @escaping (Bool, String?) -> Void) {
+        let stopID = userStopID
+        let complete: (Bool, String?) -> Void = { success, error in
+            completion(self.userStopID == stopID && success, self.userStopID == stopID ? error : Self.settingsChangeCancelled)
+        }
+        if restartBackend { start(completion: complete); return }
+        guard let process, process.isRunning, let port = activePort else {
+            complete(false, L10n.shared.backendExitedEarly)
+            return
+        }
+        let engine = currentEngine
+        let enable = SettingsStore.shared.usesSystemProxy
+        maintenanceQueue.async {
+            let error: String?
+            if enable {
+                error = SystemProxyController.shared.apply(mode: engine.proxyMode, port: port)
+            } else {
+                error = self.disableSystemProxy() ? nil : SystemProxyController.shared.lastError
+            }
+            DispatchQueue.main.async {
+                guard self.process === process, process.isRunning else {
+                    complete(false, error ?? L10n.shared.backendExitedEarly)
+                    return
+                }
+                complete(error == nil, error)
+                (NSApp.delegate as? AppDelegate)?.refreshUI()
+            }
         }
     }
 
@@ -195,6 +249,7 @@ final class DPIKillerManager {
             DispatchQueue.main.async {
                 guard let self, let terminatedProcess = process else { return }
                 guard self.process === terminatedProcess else { return }
+                AppLogger.log("[Backend] Exit: pid=\(terminatedProcess.processIdentifier), engine=\(engine.rawValue), status=\(terminatedProcess.terminationStatus), reason=\(terminatedProcess.terminationReason.rawValue). Output: \(capturedStartupOutput())")
                 let unexpected = self.wasRunningBeforeDisconnect && !self.internalRestartInProgress && self.didBecomeReady
                 self.resetBackendState()
                 (NSApp.delegate as? AppDelegate)?.refreshUI()
@@ -207,6 +262,7 @@ final class DPIKillerManager {
         do {
             try process.run()
             self.process = process
+            AppLogger.log("[Backend] Launched: pid=\(process.processIdentifier), engine=\(engine.rawValue), port=\(port), systemProxy=\(forceSystemProxy || SettingsStore.shared.usesSystemProxy), args=\(AppLogger.safeArguments(process.arguments ?? [])).")
             waitForBackendReady(engine: engine, process: process, port: port) { [weak self] ready in
                 DispatchQueue.main.async {
                     guard let self, self.lifecycleID == requestID else {
@@ -269,25 +325,20 @@ final class DPIKillerManager {
                     let usesSystemProxy = forceSystemProxy || SettingsStore.shared.usesSystemProxy
                     self.maintenanceQueue.async { [weak self] in
                         guard let self else { return }
-                        let passes = !usesSystemProxy || self.proxyPassesInternetCheck(engine: engine, port: port)
+                        // OS activation is independent of upstream availability.
+                        let proxyError = usesSystemProxy ? SystemProxyController.shared.apply(mode: engine.proxyMode, port: port) : nil
                         DispatchQueue.main.async {
-                            guard self.process === process, process.isRunning else {
-                                completion(false, L10n.shared.backendExitedEarly)
+                            guard self.lifecycleID == requestID, self.process === process, process.isRunning else {
+                                completion(false, Self.settingsChangeCancelled)
                                 return
                             }
-                            guard passes else {
-                                self.stop()
-                                completion(false, L10n.shared.proxyConnectivityFailed)
-                                return
+                            self.markBackendReady(port: port) { _, _ in }
+                            if let proxyError {
+                                AppLogger.log("[Manager] System proxy activation failed; keeping local backend pid=\(process.processIdentifier): \(proxyError)")
+                                completion(false, proxyError)
+                            } else {
+                                completion(true, nil)
                             }
-                            if usesSystemProxy {
-                                if let error = SystemProxyController.shared.apply(mode: engine.proxyMode, port: port) {
-                                    self.stop()
-                                    completion(false, error)
-                                    return
-                                }
-                            }
-                            self.markBackendReady(port: port, completion: completion)
                         }
                     }
                 }
@@ -334,6 +385,7 @@ final class DPIKillerManager {
         activePort = port
         didBecomeReady = true
         startWatchdog()
+        AppLogger.log("[Manager] Ready: pid=\(process?.processIdentifier ?? 0), port=\(port), mode=\(SystemProxyController.shared.hasLease ? "system proxy" : "local proxy").")
         completion(true, nil)
         (NSApp.delegate as? AppDelegate)?.refreshUI()
     }
@@ -351,11 +403,14 @@ final class DPIKillerManager {
                 + (proxy.map { ["--noproxy", "", "--proxy", $0] } ?? ["--noproxy", "*"])
                 + [url]
             task.standardOutput = FileHandle.nullDevice
-            task.standardError = FileHandle.nullDevice
+            let errors = Pipe()
+            task.standardError = errors
             do {
                 try task.run()
                 task.waitUntilExit()
                 if task.terminationStatus == 0 { return true }
+                let detail = String(data: errors.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                AppLogger.log("[Probe] Failed: route=\(proxy ?? "direct"), target=\(url), exit=\(task.terminationStatus), detail=\(detail.trimmingCharacters(in: .whitespacesAndNewlines)).")
             } catch {
                 AppLogger.log("[Manager] Proxy check could not start: \(error.localizedDescription)")
             }
@@ -363,7 +418,13 @@ final class DPIKillerManager {
         return false
     }
 
-    func stop() {
+    @discardableResult
+    func stop(userRequested: Bool = true) -> Bool {
+        if userRequested { userStopID = UUID() }
+        guard disableSystemProxy() else {
+            AppLogger.log("[Manager] Stop refused: proxy restoration failed; keeping backend pid=\(process?.processIdentifier ?? 0).")
+            return false
+        }
         lifecycleID = UUID()
         restartWorkItem?.cancel()
         restartWorkItem = nil
@@ -381,11 +442,31 @@ final class DPIKillerManager {
         stopWatchdog()
         outputPipe?.fileHandleForReading.readabilityHandler = nil
         outputPipe = nil
-        disableSystemProxy()
+        AppLogger.log("[Manager] Stop requested: pid=\(process?.processIdentifier ?? 0), userRequested=\(userRequested).")
         terminateBackend(process)
         process = nil
         stopDualProcesses()
         (NSApp.delegate as? AppDelegate)?.refreshUI()
+        return true
+    }
+
+    func stopAsync(completion: @escaping (Bool, String?) -> Void) {
+        userStopID = UUID()
+        lifecycleID = UUID()
+        let requestID = lifecycleID
+        restartWorkItem?.cancel()
+        wasRunningBeforeDisconnect = false
+        maintenanceQueue.async {
+            let restored = self.disableSystemProxy()
+            let error = SystemProxyController.shared.lastError
+            DispatchQueue.main.async {
+                guard self.lifecycleID == requestID else {
+                    completion(false, Self.settingsChangeCancelled)
+                    return
+                }
+                completion(restored && self.stop(userRequested: false), error)
+            }
+        }
     }
 
     func fullCleanup() {
@@ -398,7 +479,12 @@ final class DPIKillerManager {
         cleanupLock.unlock()
 
         AppLogger.log("[Manager] Performing full cleanup...")
-        stop()
+        guard stop() else {
+            cleanupLock.lock()
+            hasPerformedCleanup = false
+            cleanupLock.unlock()
+            return
+        }
         _ = stoppingBackends.wait(timeout: .now() + 2)
     }
 
@@ -509,9 +595,9 @@ final class DPIKillerManager {
 
     private func restartAfterConnectivityRestoration(completion: @escaping (Bool, String?) -> Void) {
         if isRunning, process?.isRunning == true, activePort != nil,
-           !forceSystemProxyOverride, !SettingsStore.shared.usesSystemProxy {
+           let port = activePort, isLocalPortReachable(port: port) {
             shouldRestoreAfterDisconnect = false
-            AppLogger.log("[Manager] Network restored. Keeping the active local backend.")
+            AppLogger.log("[Manager] Network restored. Keeping backend pid=\(process?.processIdentifier ?? 0) on port \(port).")
             completion(true, nil)
             return
         }
@@ -613,7 +699,7 @@ final class DPIKillerManager {
                     guard self.servingFailureStrikes >= 3 else { return }
                 }
                 AppLogger.log("[Watchdog] Backend not serving (process alive: \(alive), port reachable: \(reachable), internet works: \(internetWorks)). Recycling...")
-                self.disableSystemProxy()
+                guard self.disableSystemProxy() else { return }
                 self.terminateBackend(process)
                 self.resetBackendState()
                 (NSApp.delegate as? AppDelegate)?.refreshUI()
@@ -638,6 +724,7 @@ final class DPIKillerManager {
                 kill(process.processIdentifier, SIGKILL)
             }
             process.waitUntilExit()
+            AppLogger.log("[Backend] Stopped: pid=\(process.processIdentifier), status=\(process.terminationStatus), reason=\(process.terminationReason.rawValue).")
             stoppingBackends.leave()
         }
     }
@@ -646,55 +733,13 @@ final class DPIKillerManager {
         // Teardown retains exact Process objects until their exit is confirmed.
     }
 
-    func disableSystemProxy() {
+    @discardableResult
+    func disableSystemProxy() -> Bool {
         if !SystemProxyController.shared.restore() {
-            AppLogger.log("[Manager] Failed to restore the saved system proxy configuration.")
+            AppLogger.log("[Manager] Proxy restoration failed: \(SystemProxyController.shared.lastError ?? "unknown").")
+            return false
         }
-        let candidatePorts = Set([
-            SettingsStore.shared.lastAppliedSystemProxyPort,
-            SettingsStore.shared.lastAppliedDualCiadpiPort
-        ].compactMap { $0 })
-        let ports = candidatePorts.map(String.init).joined(separator: " ")
-        guard !ports.isEmpty else { return }
-
-        let script = """
-        app_ports=(\(ports));
-
-        owns_app_proxy() {
-          local output="$1"
-          local enabled server port
-          enabled=$(printf '%s\\n' "$output" | awk -F': ' '/^Enabled:/ {print $2; exit}')
-          server=$(printf '%s\\n' "$output" | awk -F': ' '/^Server:/ {print $2; exit}')
-          port=$(printf '%s\\n' "$output" | awk -F': ' '/^Port:/ {print $2; exit}')
-          [ "$enabled" = "Yes" ] || return 1
-          [ "$server" = "127.0.0.1" ] || [ "$server" = "localhost" ] || return 1
-          for app_port in "${app_ports[@]}"; do
-            [ "$port" = "$app_port" ] && return 0
-          done
-          return 1
-        }
-
-        services=$(networksetup -listallnetworkservices | grep -v '^An asterisk' | grep -v '^\\*$');
-        while IFS= read -r service; do
-          [ -z "$service" ] && continue
-          if owns_app_proxy "$(networksetup -getwebproxy "$service" 2>/dev/null)"; then
-            networksetup -setwebproxystate "$service" off 2>/dev/null
-          fi
-          if owns_app_proxy "$(networksetup -getsecurewebproxy "$service" 2>/dev/null)"; then
-            networksetup -setsecurewebproxystate "$service" off 2>/dev/null
-          fi
-          if owns_app_proxy "$(networksetup -getsocksfirewallproxy "$service" 2>/dev/null)"; then
-            networksetup -setsocksfirewallproxystate "$service" off 2>/dev/null
-          fi
-        done <<< "$services"
-        """
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        process.arguments = ["-c", script]
-        try? process.run()
-        process.waitUntilExit()
-        SettingsStore.shared.lastAppliedSystemProxyPort = nil
-        SettingsStore.shared.lastAppliedDualCiadpiPort = nil
+        return true
     }
 
     // MARK: - Dual mode (spoofdpi HTTP plus ciadpi SOCKS together)
@@ -1179,7 +1224,7 @@ final class DPIKillerManager {
                     return
                 }
                 if self.isLocalPortReachable(port: port) {
-                    AppLogger.log("[Manager] \(engine.displayName) is ready on port \(port).")
+                    AppLogger.log("[Manager] \(engine.displayName) listener is reachable on port \(port).")
                     completion(true)
                     return
                 }
@@ -1344,6 +1389,10 @@ final class DPIKillerManager {
         let socketFileDescriptor = socket(AF_INET, SOCK_STREAM, 0)
         guard socketFileDescriptor >= 0 else { return false }
         defer { close(socketFileDescriptor) }
+
+        var reuseAddress: Int32 = 1
+        guard setsockopt(socketFileDescriptor, SOL_SOCKET, SO_REUSEADDR, &reuseAddress,
+                         socklen_t(MemoryLayout<Int32>.size)) == 0 else { return false }
 
         var address = sockaddr_in()
         address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)

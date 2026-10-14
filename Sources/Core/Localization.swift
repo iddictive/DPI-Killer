@@ -78,7 +78,7 @@ struct L10n {
     var dnsDisabledForCiadpi: String { isRussian ? "DNS override работает только с spoofdpi." : "DNS override is available only with spoofdpi." }
 
     var descSystemProxy: String { isRussian ? "Использовать системный прокси" : "Use system-wide proxy" }
-    var systemProxyModeHelp: String { isRussian ? "Включает прокси только для текущего подключения после проверки доступа к интернету. При остановке прежние настройки вернутся." : "Enables the proxy for the current connection after checking internet access. Previous settings return when stopped." }
+    var systemProxyModeHelp: String { isRussian ? "Включает прокси для текущего подключения. macOS может запросить разрешение администратора. При остановке прежние настройки вернутся." : "Enables the proxy for the current connection. macOS may request administrator permission. Previous settings return when stopped." }
     var systemProxyConflict: String { isRussian ? "У текущего подключения уже есть прокси. Выключи его или используй локальный режим." : "The current connection already has a proxy. Turn it off or use local mode." }
     var systemProxyUnavailable: String { isRussian ? "Не удалось определить текущее сетевое подключение. Системный прокси не включён." : "The current network connection could not be identified. System proxy was not enabled." }
     var systemProxyApplyFailed: String { isRussian ? "Не удалось применить системный прокси. Проверь настройки сети." : "Could not apply the system proxy. Check network settings." }

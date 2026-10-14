@@ -15,6 +15,48 @@ owns saved proxy restoration, NetworkMonitor owns connectivity events. The
 SettingsStore currently resolves legacy dual selection to a single engine;
 unreachable dual proxy setup is outside this repair.
 
+Settings follow-up: the installed app's system proxy toggle failed because its
+preferences session had no administrator authorization (SCError 1003). Use
+Apple's SCPreferencesCreateWithAuthorization and serialized background
+transactions; confirmation comes from the active dynamic store. Native refusal
+keeps the local process serving and preserves failed recovery snapshots.
+SettingsStore owns both preview and actual command arguments. SettingsViewModel
+saves after a short debounce and applies changes serially; proxy-only changes
+keep the same process, command changes restart once, and failed changes restore
+the prior settings/backend. Explicit Stop cancels pending startup/recovery.
+The footer carries results; the Save/Cancel footer actions are removed, with
+native window close retained. No network association change is required.
+
+Additional acceptance: grant and deny native proxy authorization; verify active
+SOCKS/HTTP configuration and real requests, then restore the original entries.
+Toggle system proxy without changing the backend PID, replay engine/argument
+changes and an invalid argument rollback, and observe automatic application in
+the installed Settings window. Logs must include PID/arguments, exit status,
+proxy transaction stage/native error, probe errors and rollback outcome.
+
+Authorization contract: [Apple SCPreferencesCreateWithAuthorization](https://developer.apple.com/documentation/systemconfiguration/scpreferencescreatewithauthorization(_:_:_:_:))
+and the [configd preference helper](https://github.com/apple-oss-distributions/configd/blob/main/SystemConfiguration.fproj/helper/SCHelper_server.c).
+
+Native follow-up evidence: enabling SOCKS in the installed Settings window kept
+the same PID and activated the exact loopback endpoint; HTTPS succeeded on both
+routes. Stop restored the original disabled native dictionary and removed the
+owned child. A further installed batch completed 48 direct/SOCKS requests without
+failures. Isolated real-backend/model replay passed autosave, unchanged-command
+PID preservation, command-change restart, invalid argument rollback, both engine
+switches, and explicit Stop during reconfiguration without resurrection.
+A concurrent app restart made the separate system-proxy probe reject a foreign
+active endpoint; the probe preserved it and rolled its own settings back. This
+is a conflict rejection, not a completed grant/deny authorization replay.
+
+UI follow-up: network optimization remains visible when already applied and
+does not repeat its administrator operation. Preset definitions own applied
+values, matching selection and engine-specific explanations. Manual changes
+show Custom settings; SpoofDPI explicitly reports identical Balanced/Hotspot
+behavior. The existing native window/body scroll owner is retained.
+Port availability now uses SO_REUSEADDR so a stopped listener in TIME_WAIT does
+not appear occupied; a native socket probe showed non-reuse rejection, reuse
+success, and continued rejection of a live listener.
+
 Reuse Foundation Process and DispatchGroup: retain each stopping process until
 exit, allow a bounded SIGTERM grace period, then SIGKILL that exact child if
 needed. New launches wait for teardown; obsolete callbacks cannot reset a newer
