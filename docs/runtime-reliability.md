@@ -48,5 +48,6 @@ The installed candidate handled 144 paired direct/proxy requests over 143 second
 with one unchanged backend process. There were nine failing pairs on both routes
 and no proxy-only failures. A bounded recovery probe subsequently timed out on
 both routes too. This establishes a separate connection problem; it does not
-prove its carrier/router cause or close hotspot throughput acceptance. The
-current connection source (phone hotspot versus router) needs confirmation.
+prove its carrier/router cause or close hotspot throughput acceptance. These
+measurements ran on a router connection; hotspot throughput still needs replay
+after reconnecting to the intended phone network.
