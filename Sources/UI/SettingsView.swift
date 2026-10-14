@@ -352,6 +352,13 @@ struct SettingsView: View {
             Toggle(L10n.shared.descSystemProxy, isOn: $viewModel.systemProxyEnabled)
                 .toggleStyle(.checkbox)
 
+            if NetworkSettingsClient.shared.isSupported, NetworkSettingsClient.shared.needsApproval {
+                Button(text(ru: "Разрешить сетевой помощник в macOS", en: "Approve network helper in macOS")) {
+                    NetworkSettingsClient.shared.openApprovalSettings()
+                }
+                .buttonStyle(.bordered)
+            }
+
             Text(L10n.shared.systemProxyModeHelp)
                 .font(DPISettingsTokens.captionFont)
                 .foregroundStyle(DPISettingsTokens.secondaryText)
@@ -894,6 +901,7 @@ final class SettingsViewModel: ObservableObject {
     }
 
     var runtimeStatusTitle: String {
+        if DPIKillerManager.shared.runtimeStatus == .needsAttention { return L10n.shared.statusPartial }
         guard backendRunning else { return L10n.shared.statusStopped }
         let portSuffix = backendRunning ? " • Port \(runtimePort ?? DPIKillerManager.shared.proxyPort)" : ""
         return (SystemProxyController.shared.hasLease ? L10n.shared.runtimeModeProxy : L10n.shared.runtimeModeLocalProxy) + portSuffix
@@ -1424,9 +1432,9 @@ final class SettingsViewModel: ObservableObject {
             if success {
                 self.lastAppliedDraft = saved
                 if self.settingsDraft() == requested { self.restoreDraft(saved) }
-                self.footerStatus = DPIKillerManager.shared.isRunning
+                self.footerStatus = error ?? (DPIKillerManager.shared.isRunning
                     ? self.text(ru: "Настройки применены.", en: "Settings applied.")
-                    : self.text(ru: "Настройки сохранены. Движок выключен.", en: "Settings saved. Backend is stopped.")
+                    : self.text(ru: "Настройки сохранены. Движок выключен.", en: "Settings saved. Backend is stopped."))
                 AppLogger.log("[Settings] Applied successfully. backendActive=\(DPIKillerManager.shared.isRunning).")
             } else {
                 self.lastAppliedDraft = previous
@@ -1442,6 +1450,10 @@ final class SettingsViewModel: ObservableObject {
         }
         guard wasRunning else { finish(true, nil); return }
         DPIKillerManager.shared.reconfigure(restartBackend: restart) { success, error in
+            if NetworkSettingsClient.shared.isSupported, NetworkSettingsClient.shared.needsApproval {
+                finish(true, NetworkSettingsClient.shared.approvalMessage)
+                return
+            }
             if error == DPIKillerManager.settingsChangeCancelled {
                 finish(true, error)
                 return

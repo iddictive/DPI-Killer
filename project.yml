@@ -51,15 +51,53 @@ targets:
       - sdk: Network.framework
       - sdk: NetworkExtension.framework
       - sdk: SystemExtensions.framework
+      - sdk: ServiceManagement.framework
+      - target: DPIKillerNetworkHelper
       - target: DPIKillerTunnel
         embed: true
     postBuildScripts:
+      - name: Embed Network Helper
+        script: |
+          mkdir -p "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/HelperTools"
+          mkdir -p "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchDaemons"
+          cp "$BUILT_PRODUCTS_DIR/DPIKillerNetworkHelper" "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/HelperTools/DPIKillerNetworkHelper"
+          cp "$SRCROOT/Helpers/NetworkSettings/com.antigravity.DPIKiller.NetworkHelper.plist" "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchDaemons/com.antigravity.DPIKiller.NetworkHelper.plist"
+        inputFiles:
+          - $(BUILT_PRODUCTS_DIR)/DPIKillerNetworkHelper
+          - $(SRCROOT)/Helpers/NetworkSettings/com.antigravity.DPIKiller.NetworkHelper.plist
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/HelperTools/DPIKillerNetworkHelper
+          - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchDaemons/com.antigravity.DPIKiller.NetworkHelper.plist
       - name: Copy App Icon
         script: |
           mkdir -p "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
           cp "$SRCROOT/assets/AppIcon.icns" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/AppIcon.icns"
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/AppIcon.icns
+
+  DPIKillerNetworkHelper:
+    type: tool
+    platform: macOS
+    sources:
+      - path: Helpers/NetworkSettings/main.swift
+      - path: Sources/Shared/NetworkSettingsProtocol.swift
+      - path: Sources/Services/SystemProxyController.swift
+      - path: Sources/Core/BypassEngine.swift
+      - path: Sources/Core/SettingsModels.swift
+      - path: Sources/Core/Localization.swift
+      - path: Sources/Core/Logging.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.antigravity.DPIKiller.NetworkHelper
+        PRODUCT_NAME: DPIKillerNetworkHelper
+        GENERATE_INFOPLIST_FILE: YES
+        CREATE_INFOPLIST_SECTION_IN_BINARY: YES
+        OTHER_SWIFT_FLAGS: "$(inherited) -D DPIKILLER_NETWORK_HELPER"
+        SKIP_INSTALL: YES
+    dependencies:
+      - sdk: Foundation.framework
+      - sdk: SystemConfiguration.framework
+      - sdk: Security.framework
 
   DPIKillerTunnel:
     type: app-extension
@@ -104,4 +142,5 @@ schemes:
     build:
       targets:
         DPIKiller: all
+        DPIKillerNetworkHelper: all
         DPIKillerTunnel: all

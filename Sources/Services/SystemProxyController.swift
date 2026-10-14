@@ -36,9 +36,22 @@ final class SystemProxyController {
 
     private let leaseKey = "systemProxyLease"
     private let lock = NSRecursiveLock()
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
+    private let privileged: Bool
     private var authorization: AuthorizationRef?
     private var errorMessage: String?
+    init(defaults: UserDefaults = .standard, privileged: Bool = false) {
+        self.defaults = defaults
+        self.privileged = privileged
+    }
+
+    private var usesNetworkHelper: Bool {
+        #if DPIKILLER_NETWORK_HELPER
+        return false
+        #else
+        return !privileged && NetworkSettingsClient.shared.isSupported
+        #endif
+    }
     private(set) var lastError: String? {
         get {
             lock.lock()
@@ -53,6 +66,9 @@ final class SystemProxyController {
     }
 
     var hasLease: Bool {
+        #if !DPIKILLER_NETWORK_HELPER
+        if usesNetworkHelper { return NetworkSettingsClient.shared.hasLease }
+        #endif
         // UserDefaults reads are thread-safe. UI must not wait on the
         // transaction lock while macOS is showing an authorization prompt.
         return defaults.data(forKey: leaseKey) != nil
@@ -63,6 +79,13 @@ final class SystemProxyController {
     }
 
     func apply(mode: ProxyMode, port: Int) -> String? {
+        #if !DPIKILLER_NETWORK_HELPER
+        if usesNetworkHelper {
+            let response = NetworkSettingsClient.shared.applyProxy(mode: mode, port: port, legacyLease: defaults.data(forKey: leaseKey))
+            finishHelperResponse(response)
+            return response.error
+        }
+        #endif
         lock.lock()
         defer { lock.unlock() }
 
@@ -115,7 +138,9 @@ final class SystemProxyController {
             return failure("save recovery snapshot", detail: "Could not encode proxy lease")
         }
         defaults.set(data, forKey: leaseKey)
-        defaults.synchronize()
+        guard defaults.synchronize(), defaults.data(forKey: leaseKey) == data else {
+            return failure("save recovery snapshot", detail: "Could not persist the proxy recovery lease; network settings were not changed")
+        }
         AppLogger.log("[Proxy] Recovery snapshot saved: service=\(serviceID), entries=\(prefixes.joined(separator: "/")).")
 
         for prefix in prefixes {
@@ -147,6 +172,13 @@ final class SystemProxyController {
 
     @discardableResult
     func restore() -> Bool {
+        #if !DPIKILLER_NETWORK_HELPER
+        if usesNetworkHelper {
+            let response = NetworkSettingsClient.shared.restoreProxy(legacyLease: defaults.data(forKey: leaseKey))
+            finishHelperResponse(response)
+            return response.error == nil
+        }
+        #endif
         lock.lock()
         defer { lock.unlock() }
 
@@ -215,6 +247,13 @@ final class SystemProxyController {
     }
 
     private func authorizedPreferences() -> SCPreferences? {
+        if privileged {
+            guard geteuid() == 0 else {
+                failure("validate helper privilege", detail: "Network helper is not running as root")
+                return nil
+            }
+            return SCPreferencesCreate(nil, "DPI Killer Network Helper" as CFString, nil)
+        }
         if authorization == nil {
             let status = AuthorizationCreate(nil, nil, [], &authorization)
             guard status == errAuthorizationSuccess, authorization != nil else {
@@ -229,6 +268,36 @@ final class SystemProxyController {
         AppLogger.log("[Proxy] Authorized preferences session opened; macOS may request administrator approval.")
         return preferences
     }
+
+    func importRecoveryLease(_ data: Data) -> String? {
+        lock.lock(); defer { lock.unlock() }
+        guard data.count <= 16 * 1024, let lease = try? JSONDecoder().decode(Lease.self, from: data), lease.isValid else {
+            return failure("import recovery snapshot", detail: "Invalid legacy proxy snapshot")
+        }
+        if let existing = defaults.data(forKey: leaseKey) {
+            guard existing == data else {
+                return failure("import recovery snapshot", detail: "Network helper already owns a different recovery snapshot")
+            }
+            return nil
+        }
+        defaults.set(data, forKey: leaseKey)
+        guard defaults.synchronize(), defaults.data(forKey: leaseKey) == data else {
+            return failure("import recovery snapshot", detail: "Could not persist legacy proxy snapshot")
+        }
+        AppLogger.log("[Proxy] Legacy recovery snapshot imported and verified in the network helper.")
+        return nil
+    }
+
+    #if !DPIKILLER_NETWORK_HELPER
+    private func finishHelperResponse(_ response: NetworkSettingsResponse) {
+        if response.legacyLeaseImported {
+            defaults.removeObject(forKey: leaseKey)
+            defaults.synchronize()
+        }
+        lastError = response.error
+        if let error = response.error { AppLogger.log("[Proxy] Helper operation failed: \(error)") }
+    }
+    #endif
 
     private func isAlreadyApplied(prefixes: [String], port: Int) -> Bool {
         guard let data = defaults.data(forKey: leaseKey),

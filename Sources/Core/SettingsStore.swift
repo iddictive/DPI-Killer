@@ -387,6 +387,13 @@ final class SettingsStore {
 
     func applyNetworkOptimization(completion: @escaping (Bool, String?) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
+            if NetworkSettingsClient.shared.isSupported {
+                let response = NetworkSettingsClient.shared.applyHotspotTTL()
+                DispatchQueue.main.async {
+                    completion(response.error == nil && response.ttl == 65, response.error)
+                }
+                return
+            }
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
             process.arguments = [

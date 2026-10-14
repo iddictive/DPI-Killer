@@ -1,11 +1,7 @@
 import Cocoa
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private enum RuntimeStatus: Hashable {
-        case stopped
-        case runningUnoptimized
-        case runningOptimized
-    }
+    private typealias RuntimeStatus = DPIKillerManager.RuntimeStatus
 
     var statusItem: NSStatusItem?
     var settingsWindow: SettingsWindowController?
@@ -15,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var logWindow: LogWindowController?
 
     private var iconCache: [RuntimeStatus: NSImage] = [:]
+    private var lastMenuStatus: RuntimeStatus?
     private var lastRefreshTime: Date = .distantPast
     private let refreshThrottleInterval: TimeInterval = 0.5
     private var refreshPending = false
@@ -65,6 +62,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DPIKillerManager.shared.fullCleanup()
     }
 
+    func applicationDidBecomeActive(_ notification: Notification) {
+        if NetworkSettingsClient.shared.isSupported { NetworkSettingsClient.shared.checkApproval() }
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard DPIKillerManager.shared.process?.isRunning == true || SystemProxyController.shared.hasLease else { return .terminateNow }
         DPIKillerManager.shared.stopAsync { [weak self] success, error in
@@ -93,7 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showStartupFailureAlert(error: String?) {
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = L10n.shared.failedToStart
+        alert.messageText = startupFailureTitle()
         alert.informativeText = userFacingStartupMessage(error)
 
         NSApp.activate(ignoringOtherApps: true)
@@ -146,7 +147,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if !success {
                     let alert = NSAlert()
                     alert.alertStyle = .warning
-                    alert.messageText = L10n.shared.failedToStart
+                    alert.messageText = self?.startupFailureTitle() ?? L10n.shared.failedToStart
                     alert.informativeText = self?.userFacingStartupMessage(error) ?? L10n.shared.startupFailureInfo
                     NSApp.activate(ignoringOtherApps: true)
                     self?.presentAlert(alert)
@@ -317,6 +318,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let status = DPIKillerManager.shared.isUsingProxyFallback
             ? "\(statusTitle(for: runtimeStatus)) · \(L10n.shared.runtimeModeProxyFallback)"
             : statusTitle(for: runtimeStatus)
+        if lastMenuStatus != runtimeStatus {
+            lastMenuStatus = runtimeStatus
+            AppLogger.log("[Runtime] Menu status=\(runtimeStatus), title=\(status), pid=\(DPIKillerManager.shared.process?.processIdentifier ?? 0), issue=\(DPIKillerManager.shared.runtimeIssue ?? "none").")
+        }
         menu.addItem(disabledMenuItem(title: status))
         menu.addItem(actionMenuItem(title: isModeRunning() ? L10n.shared.stop : L10n.shared.start, action: #selector(toggle), key: "t"))
 
@@ -398,8 +403,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func currentRuntimeStatus() -> RuntimeStatus {
-        guard DPIKillerManager.shared.isRunning else { return .stopped }
-        return .runningOptimized
+        DPIKillerManager.shared.runtimeStatus
     }
 
     func restartRuntime() {
@@ -422,9 +426,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch status {
         case .stopped:
             return L10n.shared.statusStopped
-        case .runningUnoptimized:
+        case .needsAttention:
             return L10n.shared.statusPartial
-        case .runningOptimized:
+        case .localProxy:
+            return L10n.shared.runtimeModeLocalProxy
+        case .systemProxy:
             return L10n.shared.statusActive
         }
     }
@@ -470,7 +476,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return helpWindow?.window
     }
 
+    private func startupFailureTitle() -> String {
+        guard DPIKillerManager.shared.isRunning else { return L10n.shared.failedToStart }
+        return L10n.shared.isRussian ? "Системный прокси не включён" : "System proxy could not be enabled"
+    }
+
     private func userFacingStartupMessage(_ error: String?) -> String {
+        if DPIKillerManager.shared.isRunning, error?.hasPrefix("Network helper setup failed:") == true {
+            return L10n.shared.isRussian
+                ? "Не удалось установить сетевой помощник. Локальный прокси продолжает работать. Подробности ошибки — в журнале."
+                : "The network helper could not be installed. The local proxy keeps running. Error details are in the log."
+        }
         guard let error,
               !error.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return L10n.shared.startupFailureInfo
@@ -500,9 +516,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch status {
         case .stopped:
             return NSColor.systemRed
-        case .runningUnoptimized:
+        case .needsAttention:
             return NSColor.systemOrange
-        case .runningOptimized:
+        case .localProxy:
+            return NSColor.systemBlue
+        case .systemProxy:
             return NSColor.systemGreen
         }
     }

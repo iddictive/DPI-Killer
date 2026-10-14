@@ -57,6 +57,65 @@ Port availability now uses SO_REUSEADDR so a stopped listener in TIME_WAIT does
 not appear occupied; a native socket probe showed non-reuse rejection, reuse
 success, and continued rejection of a live listener.
 
+Persistent authorization follow-up: the actual configd right is
+`system.services.systemconfiguration.network`, which routes to
+`authenticate-admin-nonshared` with a 30-second timeout on the accepting Mac.
+Explicit acquisition cannot extend this native policy. Reuse SMAppService's
+approved LaunchDaemon and Foundation's macOS 13 peer signing requirements.
+The app and helper use the same existing Apple signing identity; helper accepts
+only the exact signed app identifier/team, and the app validates the helper.
+No global authorization rule is changed and no arbitrary command is exported.
+
+The helper owns the canonical persisted proxy lease under its root preferences
+domain and reuses SystemProxyController transactions. The app migrates any prior
+lease only after acknowledged durable import. The fixed IPC surface is proxy
+apply/restore, status and system TTL 65. Disconnect/crash restores the owning
+connection's proxy; unrelated clients cannot undo it. The app keeps its local
+backend through missing approval or helper failure. Ordinary signed startup,
+upgrade and delivered builds include the same bundled helper/plist; unsigned
+development keeps the existing direct authorization path. Registration occurs
+only for a requested privileged action. First activation requires native
+administrator approval in Login Items; subsequent operations use authenticated
+IPC and must work beyond the original 30-second expiry.
+
+Accept signed native registration, grant/pending refusal preserving local
+traffic, repeated apply/restore/TTL after 30 seconds with no new authorization,
+old lease migration, owning app crash restoration and rejected peer identity.
+Build/sign/install remains one integration owner; no public release or new
+paid signing service is requested.
+
+Native registration on this Mac failed before any approval prompt with
+Operation not permitted. The installed ServiceManagement header requires
+notarization for bundled LaunchDaemons, and the local Apple Development build
+does not pass Gatekeeper assessment. Local signed builds therefore explicitly
+select the protected legacy launchd installation supported by the same header;
+distribution builds retain SMAppService. One native administrator confirmation
+installs the exact signed helper, root-owned executable and fixed daemon plist.
+Ordinary network changes reuse authenticated IPC. Native revocation is respected;
+no global authorization policy, Gatekeeper setting or arbitrary command RPC is
+changed. Upgrade verifies both prior and staged helper identities and preserves
+the previous helper for bootstrap rollback.
+
+Runtime status is owned by DPIKillerManager and consumed by both menu and
+Settings. A failed system proxy activation remains Needs attention even when
+the local backend is alive and settings roll back. Local-only mode is blue;
+green Active requires a successful system proxy lease. Helper disconnect clears
+the cached active lease and attempts one recovery while the backend stays alive.
+
+Installed checkpoint: executable SHA-256
+`c298eef1c80c2ecaa9581ff2127be9e1716ca895de4514f2f222c6267baea9ce`;
+helper SHA-256
+`749ba401d36ace2593560b062a8f16e1c785cb4151809fecd1233ca0de53fadc`.
+Build and strict signature verification passed. The first protected installation
+failed before writing helper files because codesign's inline requirement needs
+the `=` prefix. The corrected positive requirement probe passes and the wrong
+identifier fails. The installed Settings window shows Needs attention, and the
+actual generated menu records the same title while activation is pending.
+Local SOCKS still returns HTTP 200 with one backend PID. The installer currently
+awaits the human's native administrator confirmation; no helper daemon or active
+system proxy exists yet. Persistent authorization, signed IPC, crash restoration
+and old-lease migration remain unaccepted until that confirmation and replay.
+
 Reuse Foundation Process and DispatchGroup: retain each stopping process until
 exit, allow a bounded SIGTERM grace period, then SIGKILL that exact child if
 needed. New launches wait for teardown; obsolete callbacks cannot reset a newer

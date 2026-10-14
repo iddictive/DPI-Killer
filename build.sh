@@ -88,10 +88,31 @@ else
         -framework WebKit \
         -framework Network \
         -framework NetworkExtension \
-        -framework SystemExtensions
+        -framework SystemExtensions \
+        -framework ServiceManagement
+
+    helper_sources=(
+        Helpers/NetworkSettings/main.swift
+        Sources/Shared/NetworkSettingsProtocol.swift
+        Sources/Services/SystemProxyController.swift
+        Sources/Core/BypassEngine.swift
+        Sources/Core/SettingsModels.swift
+        Sources/Core/Localization.swift
+        Sources/Core/Logging.swift
+    )
+    mkdir -p "${APP_BUNDLE}/Contents/Library/HelperTools"
+    swiftc -D DPIKILLER_NETWORK_HELPER \
+        -module-cache-path "${MODULE_CACHE_DIR}" \
+        -o "${APP_BUNDLE}/Contents/Library/HelperTools/DPIKillerNetworkHelper" \
+        "${helper_sources[@]}" \
+        -framework Foundation -framework SystemConfiguration -framework Security
 
     cp Info.plist "${APP_BUNDLE}/Contents/Info.plist"
 fi
+
+mkdir -p "${APP_BUNDLE}/Contents/Library/LaunchDaemons"
+cp Helpers/NetworkSettings/com.antigravity.DPIKiller.NetworkHelper.plist \
+    "${APP_BUNDLE}/Contents/Library/LaunchDaemons/"
 
 mkdir -p "${APP_BUNDLE}/Contents/Resources"
 mkdir -p "${APP_BUNDLE}/Contents/MacOS"
@@ -109,6 +130,15 @@ fi
 if [ -f "spoofdpi-patched" ]; then
     cp spoofdpi-patched "${APP_BUNDLE}/Contents/MacOS/spoofdpi-binary"
     chmod +x "${APP_BUNDLE}/Contents/MacOS/spoofdpi-binary"
+fi
+
+if [ -n "${DPIKILLER_LOCAL_SIGN_IDENTITY:-}" ]; then
+    /usr/libexec/PlistBuddy -c 'Add :DPIKillerLocalNetworkHelper bool true' "${APP_BUNDLE}/Contents/Info.plist"
+    codesign --force --sign "${DPIKILLER_LOCAL_SIGN_IDENTITY}" \
+        --identifier com.antigravity.DPIKiller.NetworkHelper \
+        "${APP_BUNDLE}/Contents/Library/HelperTools/DPIKillerNetworkHelper"
+    codesign --force --deep --sign "${DPIKILLER_LOCAL_SIGN_IDENTITY}" "${APP_BUNDLE}"
+    codesign --verify --deep --strict "${APP_BUNDLE}"
 fi
 
 echo "Build complete: ${APP_BUNDLE}"

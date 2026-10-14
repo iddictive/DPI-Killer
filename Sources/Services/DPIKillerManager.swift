@@ -6,6 +6,16 @@ import Network
 final class DPIKillerManager {
     static let shared = DPIKillerManager()
 
+    enum RuntimeStatus: Hashable {
+        case stopped, localProxy, systemProxy, needsAttention
+    }
+    private(set) var runtimeIssue: String?
+    var runtimeStatus: RuntimeStatus {
+        if runtimeIssue != nil { return .needsAttention }
+        guard isRunning else { return .stopped }
+        return SystemProxyController.shared.hasLease ? .systemProxy : .localProxy
+    }
+
     private(set) var process: Process?
     private var installProcess: Process?
     private(set) var isRunning = false
@@ -66,6 +76,18 @@ final class DPIKillerManager {
     }
 
     init() {
+        NetworkSettingsClient.shared.onUnavailable = { [weak self] message in
+            guard let self, self.isRunning else { return }
+            self.runtimeIssue = message
+            (NSApp.delegate as? AppDelegate)?.settingsWindow?.reportNetworkResult(success: false, error: message)
+            (NSApp.delegate as? AppDelegate)?.refreshUI()
+        }
+        NetworkSettingsClient.shared.onReady = { [weak self] in
+            guard let self, self.isRunning, SettingsStore.shared.usesSystemProxy || self.forceSystemProxyOverride else { return }
+            self.reconfigure(restartBackend: false) { success, error in
+                (NSApp.delegate as? AppDelegate)?.settingsWindow?.reportNetworkResult(success: success, error: error)
+            }
+        }
         NetworkMonitor.shared.onConnectivityLost = { [weak self] in
             guard let self = self else { return }
             let wasActive = self.isRunning || self.process?.isRunning == true || self.wasRunningBeforeDisconnect
@@ -122,6 +144,8 @@ final class DPIKillerManager {
                     return
                 }
                 guard restored, self.stop(userRequested: false) else {
+                    self.runtimeIssue = error ?? SystemProxyController.shared.lastError
+                    (NSApp.delegate as? AppDelegate)?.refreshUI()
                     completion(false, error ?? SystemProxyController.shared.lastError)
                     return
                 }
@@ -150,7 +174,7 @@ final class DPIKillerManager {
             return
         }
         let engine = currentEngine
-        let enable = SettingsStore.shared.usesSystemProxy
+        let enable = SettingsStore.shared.usesSystemProxy || forceSystemProxyOverride
         maintenanceQueue.async {
             let error: String?
             if enable {
@@ -163,6 +187,7 @@ final class DPIKillerManager {
                     complete(false, error ?? L10n.shared.backendExitedEarly)
                     return
                 }
+                self.runtimeIssue = error
                 complete(error == nil, error)
                 (NSApp.delegate as? AppDelegate)?.refreshUI()
             }
@@ -323,6 +348,8 @@ final class DPIKillerManager {
                     }
 
                     let usesSystemProxy = forceSystemProxy || SettingsStore.shared.usesSystemProxy
+                    self.runtimeIssue = usesSystemProxy ? (L10n.shared.isRussian ? "Включение системного прокси…" : "Enabling system proxy…") : nil
+                    self.markBackendReady(port: port) { _, _ in }
                     self.maintenanceQueue.async { [weak self] in
                         guard let self else { return }
                         // OS activation is independent of upstream availability.
@@ -332,7 +359,8 @@ final class DPIKillerManager {
                                 completion(false, Self.settingsChangeCancelled)
                                 return
                             }
-                            self.markBackendReady(port: port) { _, _ in }
+                            self.runtimeIssue = proxyError
+                            (NSApp.delegate as? AppDelegate)?.refreshUI()
                             if let proxyError {
                                 AppLogger.log("[Manager] System proxy activation failed; keeping local backend pid=\(process.processIdentifier): \(proxyError)")
                                 completion(false, proxyError)
@@ -422,6 +450,8 @@ final class DPIKillerManager {
     func stop(userRequested: Bool = true) -> Bool {
         if userRequested { userStopID = UUID() }
         guard disableSystemProxy() else {
+            runtimeIssue = SystemProxyController.shared.lastError
+            (NSApp.delegate as? AppDelegate)?.refreshUI()
             AppLogger.log("[Manager] Stop refused: proxy restoration failed; keeping backend pid=\(process?.processIdentifier ?? 0).")
             return false
         }
@@ -430,6 +460,7 @@ final class DPIKillerManager {
         restartWorkItem = nil
         servingFailureStrikes = 0
         isRunning = false
+        runtimeIssue = nil
         didBecomeReady = false
         internalRestartInProgress = false
         forceSystemProxyOverride = false
@@ -463,6 +494,10 @@ final class DPIKillerManager {
                 guard self.lifecycleID == requestID else {
                     completion(false, Self.settingsChangeCancelled)
                     return
+                }
+                if !restored {
+                    self.runtimeIssue = error
+                    (NSApp.delegate as? AppDelegate)?.refreshUI()
                 }
                 completion(restored && self.stop(userRequested: false), error)
             }

@@ -67,6 +67,11 @@ final class SettingsWindowController: NSWindowController {
         model.refreshRuntimeStatus()
     }
 
+    func reportNetworkResult(success: Bool, error: String?) {
+        model.footerStatus = error ?? (L10n.shared.isRussian ? "Системный прокси включён." : "System proxy enabled.")
+        model.refreshRuntimeStatus()
+    }
+
     private func enforceFixedWindowSize(center: Bool) {
         guard let window else { return }
         let frameSize = (window as? FixedSizeWindow)?.fixedFrameSize
