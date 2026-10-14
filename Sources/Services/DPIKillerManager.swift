@@ -10,6 +10,11 @@ final class DPIKillerManager {
     private var installProcess: Process?
     private(set) var isRunning = false
     private let maintenanceQueue = DispatchQueue(label: "com.iddictive.dpikiller.maintenance", qos: .utility)
+    private let processCleanupQueue = DispatchQueue(label: "com.iddictive.dpikiller.process-cleanup", qos: .utility)
+    private let stoppingBackends = DispatchGroup()
+    private var lifecycleID = UUID()
+    private var restartWorkItem: DispatchWorkItem?
+    private var servingFailureStrikes = 0
     private let cleanupLock = NSLock()
     private var hasPerformedCleanup = false
     private var outputPipe: Pipe?
@@ -97,13 +102,28 @@ final class DPIKillerManager {
         attemptedBPFRepair: Bool = false,
         completion: @escaping (Bool, String?) -> Void
     ) {
+        stop()
         forceSystemProxyOverride = forceSystemProxy
+        wasRunningBeforeDisconnect = true
+        let requestID = lifecycleID
+        stoppingBackends.notify(queue: .main) { [weak self] in
+            guard let self, self.lifecycleID == requestID, self.wasRunningBeforeDisconnect else {
+                completion(false, L10n.shared.backendExitedEarly)
+                return
+            }
+            self.launch(forceSystemProxy: forceSystemProxy, attemptedBPFRepair: attemptedBPFRepair, completion: completion)
+        }
+    }
+
+    private func launch(
+        forceSystemProxy: Bool,
+        attemptedBPFRepair: Bool,
+        completion: @escaping (Bool, String?) -> Void
+    ) {
+        let requestID = lifecycleID
         if SettingsStore.shared.backendSelection == .dual {
             startDual(forceSystemProxy: forceSystemProxy, attemptedBPFRepair: attemptedBPFRepair, completion: completion)
             return
-        }
-        if isRunning {
-            stop()
         }
         isRunning = false
         didBecomeReady = false
@@ -174,7 +194,7 @@ final class DPIKillerManager {
         process.terminationHandler = { [weak self, weak process] _ in
             DispatchQueue.main.async {
                 guard let self, let terminatedProcess = process else { return }
-                guard self.process === terminatedProcess || self.process == nil else { return }
+                guard self.process === terminatedProcess else { return }
                 let unexpected = self.wasRunningBeforeDisconnect && !self.internalRestartInProgress && self.didBecomeReady
                 self.resetBackendState()
                 (NSApp.delegate as? AppDelegate)?.refreshUI()
@@ -189,13 +209,19 @@ final class DPIKillerManager {
             self.process = process
             waitForBackendReady(engine: engine, process: process, port: port) { [weak self] ready in
                 DispatchQueue.main.async {
-                    guard let self = self else { return }
+                    guard let self, self.lifecycleID == requestID else {
+                        completion(false, L10n.shared.backendExitedEarly)
+                        return
+                    }
                     guard self.process === process, process.isRunning else {
-                        self.isRunning = false
                         let output = capturedStartupOutput()
                         if self.shouldAttemptBPFRepair(engine: engine, output: output, attempted: attemptedBPFRepair) {
                             AppLogger.log("[Manager] SpoofDPI needs BPF access. Attempting environment repair...")
                             self.repairBPFAccess { repairSuccess, repairError in
+                                guard self.lifecycleID == requestID else {
+                                    completion(false, L10n.shared.backendExitedEarly)
+                                    return
+                                }
                                 guard repairSuccess else {
                                     completion(
                                         false,
@@ -223,7 +249,7 @@ final class DPIKillerManager {
 
                     guard ready else {
                         AppLogger.log("[Manager] Backend readiness timed out for \(engine.displayName) on port \(port).")
-                        process.terminate()
+                        self.terminateBackend(process)
                         self.outputPipe?.fileHandleForReading.readabilityHandler = nil
                         self.outputPipe = nil
                         self.process = nil
@@ -240,9 +266,10 @@ final class DPIKillerManager {
                         return
                     }
 
+                    let usesSystemProxy = forceSystemProxy || SettingsStore.shared.usesSystemProxy
                     self.maintenanceQueue.async { [weak self] in
                         guard let self else { return }
-                        let passes = self.proxyPassesInternetCheck(engine: engine, port: port)
+                        let passes = !usesSystemProxy || self.proxyPassesInternetCheck(engine: engine, port: port)
                         DispatchQueue.main.async {
                             guard self.process === process, process.isRunning else {
                                 completion(false, L10n.shared.backendExitedEarly)
@@ -253,7 +280,7 @@ final class DPIKillerManager {
                                 completion(false, L10n.shared.proxyConnectivityFailed)
                                 return
                             }
-                            if forceSystemProxy || SettingsStore.shared.usesSystemProxy {
+                            if usesSystemProxy {
                                 if let error = SystemProxyController.shared.apply(mode: engine.proxyMode, port: port) {
                                     self.stop()
                                     completion(false, error)
@@ -313,10 +340,16 @@ final class DPIKillerManager {
 
     private func proxyPassesInternetCheck(engine: BypassEngine, port: Int) -> Bool {
         let proxy = "\(engine.proxyMode == .socks ? "socks5h" : "http")://127.0.0.1:\(port)"
+        return internetPassesCheck(proxy: proxy)
+    }
+
+    private func internetPassesCheck(proxy: String? = nil) -> Bool {
         for url in ["https://www.apple.com/library/test/success.html", "https://www.cloudflare.com/cdn-cgi/trace"] {
             let task = Process()
             task.executableURL = URL(fileURLWithPath: "/usr/bin/curl")
-            task.arguments = ["--silent", "--show-error", "--fail", "--location", "--connect-timeout", "3", "--max-time", "7", "--noproxy", "", "--proxy", proxy, "--output", "/dev/null", url]
+            task.arguments = ["--silent", "--show-error", "--fail", "--location", "--connect-timeout", "3", "--max-time", "7", "--output", "/dev/null"]
+                + (proxy.map { ["--noproxy", "", "--proxy", $0] } ?? ["--noproxy", "*"])
+                + [url]
             task.standardOutput = FileHandle.nullDevice
             task.standardError = FileHandle.nullDevice
             do {
@@ -331,6 +364,10 @@ final class DPIKillerManager {
     }
 
     func stop() {
+        lifecycleID = UUID()
+        restartWorkItem?.cancel()
+        restartWorkItem = nil
+        servingFailureStrikes = 0
         isRunning = false
         didBecomeReady = false
         internalRestartInProgress = false
@@ -345,7 +382,7 @@ final class DPIKillerManager {
         outputPipe?.fileHandleForReading.readabilityHandler = nil
         outputPipe = nil
         disableSystemProxy()
-        process?.terminate()
+        terminateBackend(process)
         process = nil
         stopDualProcesses()
         (NSApp.delegate as? AppDelegate)?.refreshUI()
@@ -362,6 +399,7 @@ final class DPIKillerManager {
 
         AppLogger.log("[Manager] Performing full cleanup...")
         stop()
+        _ = stoppingBackends.wait(timeout: .now() + 2)
     }
 
     func recoverEnvironment(completion: (() -> Void)? = nil) {
@@ -377,7 +415,7 @@ final class DPIKillerManager {
     private func startWatchdog() {
         stopWatchdog()
         highCpuStrikes = 0
-        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
+        let timer = DispatchSource.makeTimerSource(queue: .main)
         timer.schedule(deadline: .now() + .seconds(Int(watchdogInterval)), repeating: .seconds(Int(watchdogInterval)))
         timer.setEventHandler { [weak self] in
             self?.checkCPU()
@@ -459,51 +497,25 @@ final class DPIKillerManager {
         }
 
         lastRestartTime = Date()
-        highCpuStrikes = 0
-        stopWatchdog()
-        internalRestartInProgress = true
-        disableSystemProxy()
-        process?.terminate()
-        process = nil
-        stopDualProcesses()
-        isRunning = false
-        killOrphans()
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            guard let self, self.wasRunningBeforeDisconnect else { return }
-            self.start(forceSystemProxy: self.forceSystemProxyOverride) { success, error in
-                self.internalRestartInProgress = false
-                if success {
-                    AppLogger.log("[Watchdog] Backend restarted successfully.")
-                } else {
-                    AppLogger.log("[Watchdog] Failed to restart backend: \(error ?? "unknown error")")
-                }
-                (NSApp.delegate as? AppDelegate)?.refreshUI()
+        start(forceSystemProxy: forceSystemProxyOverride) { success, error in
+            if success {
+                AppLogger.log("[Watchdog] Backend restarted successfully.")
+            } else {
+                AppLogger.log("[Watchdog] Failed to restart backend: \(error ?? "unknown error")")
             }
+            (NSApp.delegate as? AppDelegate)?.refreshUI()
         }
     }
 
     private func restartAfterConnectivityRestoration(completion: @escaping (Bool, String?) -> Void) {
-        shouldRestoreAfterDisconnect = false
-        highCpuStrikes = 0
-        stopWatchdog()
-        internalRestartInProgress = true
-        outputPipe?.fileHandleForReading.readabilityHandler = nil
-        outputPipe = nil
-        disableSystemProxy()
-        process?.terminate()
-        process = nil
-        stopDualProcesses()
-        isRunning = false
-        killOrphans()
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            guard let self, self.wasRunningBeforeDisconnect else { return }
-            self.start(forceSystemProxy: self.forceSystemProxyOverride) { success, error in
-                self.internalRestartInProgress = false
-                completion(success, error)
-            }
+        if isRunning, process?.isRunning == true, activePort != nil,
+           !forceSystemProxyOverride, !SettingsStore.shared.usesSystemProxy {
+            shouldRestoreAfterDisconnect = false
+            AppLogger.log("[Manager] Network restored. Keeping the active local backend.")
+            completion(true, nil)
+            return
         }
+        start(forceSystemProxy: forceSystemProxyOverride, completion: completion)
     }
 
     private func resetBackendState() {
@@ -525,7 +537,16 @@ final class DPIKillerManager {
         (NSApp.delegate as? AppDelegate)?.refreshUI()
         guard wasRunningBeforeDisconnect, SettingsStore.shared.autoReconnect else { return }
         if let lastRestart = lastRestartTime, Date().timeIntervalSince(lastRestart) < restartCooldown {
-            AppLogger.log("[Manager] Restart cooldown active, not restarting dead backend.")
+            let delay = restartCooldown - Date().timeIntervalSince(lastRestart)
+            let requestID = lifecycleID
+            restartWorkItem?.cancel()
+            let retry = DispatchWorkItem { [weak self] in
+                guard let self, self.lifecycleID == requestID, self.wasRunningBeforeDisconnect else { return }
+                self.handleUnexpectedBackendExit()
+            }
+            restartWorkItem = retry
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: retry)
+            AppLogger.log("[Manager] Restart cooldown active. Recovery scheduled in \(Int(delay.rounded(.up))) seconds.")
             return
         }
         lastRestartTime = Date()
@@ -561,26 +582,39 @@ final class DPIKillerManager {
                     for engine in dead {
                         guard let proc = self.dualProcesses[engine] else { continue }
                         AppLogger.log("[Watchdog] Dual backend \(engine.displayName) not serving. Recycling...")
-                        proc.terminate()
+                        self.terminateBackend(proc)
                         self.dualBackendTerminated(engine: engine, process: proc)
                     }
                 }
             }
             return
         }
-        guard isRunning, didBecomeReady, let port = activePort else { return }
+        guard isRunning, didBecomeReady, NetworkMonitor.shared.isConnected,
+              let port = activePort, let process else { return }
+        let engine = currentEngine
+        let needsInternetCheck = SystemProxyController.shared.hasLease
         maintenanceQueue.async { [weak self] in
             guard let self else { return }
             let reachable = self.isLocalPortReachable(port: port)
-            let internetWorks = !SystemProxyController.shared.hasLease
-                || (reachable && self.proxyPassesInternetCheck(engine: self.currentEngine, port: port))
+            let internetWorks = !needsInternetCheck
+                || (reachable && self.proxyPassesInternetCheck(engine: engine, port: port))
+            let upstreamUnavailable = needsInternetCheck && !internetWorks && !self.internetPassesCheck()
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.isRunning, self.didBecomeReady, self.activePort == port else { return }
-                let alive = self.process?.isRunning ?? false
-                guard !alive || !reachable || !internetWorks else { return }
+                guard let self, self.isRunning, self.didBecomeReady, self.process === process,
+                      NetworkMonitor.shared.isConnected else { return }
+                let alive = process.isRunning
+                if alive && reachable {
+                    if upstreamUnavailable {
+                        self.servingFailureStrikes = 0
+                        AppLogger.log("[Watchdog] Internet unavailable on both paths. Keeping the backend alive.")
+                        return
+                    }
+                    self.servingFailureStrikes = internetWorks ? 0 : self.servingFailureStrikes + 1
+                    guard self.servingFailureStrikes >= 3 else { return }
+                }
                 AppLogger.log("[Watchdog] Backend not serving (process alive: \(alive), port reachable: \(reachable), internet works: \(internetWorks)). Recycling...")
                 self.disableSystemProxy()
-                self.process?.terminate()
+                self.terminateBackend(process)
                 self.resetBackendState()
                 (NSApp.delegate as? AppDelegate)?.refreshUI()
                 self.handleUnexpectedBackendExit()
@@ -588,8 +622,28 @@ final class DPIKillerManager {
         }
     }
 
+    private func terminateBackend(_ process: Process?) {
+        guard let process else { return }
+        process.terminationHandler = nil
+        guard process.isRunning else { return }
+        stoppingBackends.enter()
+        process.terminate()
+        processCleanupQueue.async { [stoppingBackends] in
+            let deadline = Date().addingTimeInterval(0.5)
+            while process.isRunning && Date() < deadline {
+                Thread.sleep(forTimeInterval: 0.02)
+            }
+            if process.isRunning {
+                AppLogger.log("[Manager] Backend did not exit after SIGTERM. Stopping owned PID \(process.processIdentifier).")
+                kill(process.processIdentifier, SIGKILL)
+            }
+            process.waitUntilExit()
+            stoppingBackends.leave()
+        }
+    }
+
     private func killOrphans() {
-        // Only processes started by this instance are terminated via Process.
+        // Teardown retains exact Process objects until their exit is confirmed.
     }
 
     func disableSystemProxy() {
@@ -647,8 +701,7 @@ final class DPIKillerManager {
 
     private func stopDualProcesses() {
         for (_, proc) in dualProcesses {
-            proc.terminationHandler = nil
-            proc.terminate()
+            terminateBackend(proc)
         }
         dualProcesses.removeAll()
         for (_, pipe) in dualPipes {
@@ -714,8 +767,7 @@ final class DPIKillerManager {
         completion: @escaping (Bool, String?) -> Void
     ) {
         forceSystemProxyOverride = forceSystemProxy
-        process?.terminationHandler = nil
-        process?.terminate()
+        terminateBackend(process)
         process = nil
         outputPipe?.fileHandleForReading.readabilityHandler = nil
         outputPipe = nil
@@ -963,7 +1015,7 @@ final class DPIKillerManager {
                         self.dualProcesses[engine] = nil
                         self.dualPorts.removeValue(forKey: engine)
                         self.dualReadyEngines.remove(engine)
-                        proc.terminate()
+                        self.terminateBackend(proc)
                     }
                     self.reapplyDualProxyIfNeeded()
                     (NSApp.delegate as? AppDelegate)?.refreshUI()

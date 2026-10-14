@@ -51,6 +51,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         DPIKillerManager.shared.recoverEnvironment {
+            if CommandLine.arguments.contains("--start-proxy") {
+                self.toggle()
+            }
             if !CommandLine.arguments.contains("--skip-update-check") {
                 GitHubUpdater.shared.checkForUpdates()
             }

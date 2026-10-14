@@ -87,13 +87,22 @@ final class SystemProxyController {
 
         guard let data = defaults.data(forKey: leaseKey) else { return true }
         guard let lease = try? JSONDecoder().decode(Lease.self, from: data) else { return false }
-        guard let preferences = SCPreferencesCreate(nil, "DPI Killer" as CFString, nil),
-              let service = SCNetworkServiceCopy(preferences, lease.serviceID as CFString),
-              let proxy = SCNetworkServiceCopyProtocol(service, kSCNetworkProtocolTypeProxies),
-              var configuration = SCNetworkProtocolGetConfiguration(proxy) as? [String: Any] else {
-            // The old service no longer exists, so it cannot retain our proxy.
+        guard let preferences = SCPreferencesCreate(nil, "DPI Killer" as CFString, nil) else {
+            return false
+        }
+        guard let service = SCNetworkServiceCopy(preferences, lease.serviceID as CFString) else {
+            // Only a genuinely removed service makes this lease obsolete.
+            guard let services = SCNetworkServiceCopyAll(preferences) as? [SCNetworkService],
+                  !services.contains(where: { SCNetworkServiceGetServiceID($0) as String? == lease.serviceID }) else {
+                return false
+            }
             defaults.removeObject(forKey: leaseKey)
             return true
+        }
+        guard
+              let proxy = SCNetworkServiceCopyProtocol(service, kSCNetworkProtocolTypeProxies),
+              var configuration = SCNetworkProtocolGetConfiguration(proxy) as? [String: Any] else {
+            return false
         }
 
         var changed = false
@@ -101,6 +110,9 @@ final class SystemProxyController {
             guard let original = lease.originals[prefix],
                   configuration["\(prefix)Proxy"] as? String == "127.0.0.1",
                   Self.number(configuration["\(prefix)Port"]) == lease.port else { continue }
+            guard original.host != configuration["\(prefix)Proxy"] as? String
+                || original.port != Self.number(configuration["\(prefix)Port"])
+                || original.enabled != Self.number(configuration["\(prefix)Enable"]) else { continue }
             Self.set(original.host, for: "\(prefix)Proxy", in: &configuration)
             Self.set(original.port, for: "\(prefix)Port", in: &configuration)
             Self.set(original.enabled, for: "\(prefix)Enable", in: &configuration)
@@ -110,7 +122,10 @@ final class SystemProxyController {
         if changed {
             guard SCNetworkProtocolSetConfiguration(proxy, configuration as CFDictionary),
                   SCPreferencesCommitChanges(preferences),
-                  SCPreferencesApplyChanges(preferences) else { return false }
+                  SCPreferencesApplyChanges(preferences) else {
+                AppLogger.log("[Proxy] Restore failed: \(String(cString: SCErrorString(SCError()))). Saved configuration retained.")
+                return false
+            }
         }
         defaults.removeObject(forKey: leaseKey)
         return true

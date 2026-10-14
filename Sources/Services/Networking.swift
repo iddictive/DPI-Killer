@@ -10,39 +10,43 @@ final class NetworkMonitor {
     private var pendingRestorationWorkItem: DispatchWorkItem?
     private var hasStarted = false
     private let restorationStabilizationDelay: TimeInterval = 2.0
+    private(set) var isConnected = false
     var onConnectivityLost: (() -> Void)?
     var onConnectivityRestored: (() -> Void)?
 
     init() {
         monitor.pathUpdateHandler = { [weak self] path in
-            guard let self = self else { return }
-            let status = path.status
-            let previousStatus = self.lastPathStatus
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                let status = path.status
+                let previousStatus = self.lastPathStatus
 
-            guard status != previousStatus else { return }
+                guard status != previousStatus else { return }
+                self.isConnected = status == .satisfied
 
-            AppLogger.log("[NetworkMonitor] Connection status: \(status)")
-            if previousStatus != .satisfied && status == .satisfied {
-                AppLogger.log("[NetworkMonitor] Connectivity restored. Notifying...")
-                self.pendingRestorationWorkItem?.cancel()
-                let workItem = DispatchWorkItem { [weak self] in
-                    guard let self = self, self.lastPathStatus == .satisfied else { return }
-                    self.onConnectivityRestored?()
+                AppLogger.log("[NetworkMonitor] Connection status: \(status)")
+                if previousStatus != .satisfied && status == .satisfied {
+                    AppLogger.log("[NetworkMonitor] Connectivity restored. Notifying...")
+                    self.pendingRestorationWorkItem?.cancel()
+                    let workItem = DispatchWorkItem { [weak self] in
+                        guard let self = self, self.lastPathStatus == .satisfied else { return }
+                        self.onConnectivityRestored?()
+                    }
+                    self.pendingRestorationWorkItem = workItem
+                    DispatchQueue.main.asyncAfter(
+                        deadline: .now() + self.restorationStabilizationDelay,
+                        execute: workItem
+                    )
+                } else {
+                    if previousStatus == .satisfied && status != .satisfied {
+                        AppLogger.log("[NetworkMonitor] Connectivity lost. Notifying...")
+                        self.onConnectivityLost?()
+                    }
+                    self.pendingRestorationWorkItem?.cancel()
+                    self.pendingRestorationWorkItem = nil
                 }
-                self.pendingRestorationWorkItem = workItem
-                DispatchQueue.main.asyncAfter(
-                    deadline: .now() + self.restorationStabilizationDelay,
-                    execute: workItem
-                )
-            } else {
-                if previousStatus == .satisfied && status != .satisfied {
-                    AppLogger.log("[NetworkMonitor] Connectivity lost. Notifying...")
-                    self.onConnectivityLost?()
-                }
-                self.pendingRestorationWorkItem?.cancel()
-                self.pendingRestorationWorkItem = nil
+                self.lastPathStatus = status
             }
-            self.lastPathStatus = status
         }
     }
 
