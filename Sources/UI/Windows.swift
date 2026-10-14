@@ -68,8 +68,28 @@ final class SettingsWindowController: NSWindowController {
     }
 
     func reportNetworkResult(success: Bool, error: String?) {
-        model.footerStatus = error ?? (L10n.shared.isRussian ? "Системный прокси включён." : "System proxy enabled.")
+        model.footerStatus = error ?? DPIKillerManager.shared.runtimeStatusTitle
         model.refreshRuntimeStatus()
+    }
+
+    func showNetworkSettings() {
+        model.selectedTab = .network
+        showWindow(nil)
+    }
+
+    func setNetworkSettingsMode(_ mode: NetworkSettingsMode) {
+        model.networkSettingsMode = mode
+        model.save { _, _ in (NSApp.delegate as? AppDelegate)?.refreshUI() }
+    }
+
+    func setSystemProxyEnabled(_ enabled: Bool) {
+        model.systemProxyEnabled = enabled
+        model.save { _, _ in (NSApp.delegate as? AppDelegate)?.refreshUI() }
+    }
+
+    func setBackendSelection(_ selection: BackendSelection) {
+        model.backendSelection = selection
+        model.save { _, _ in (NSApp.delegate as? AppDelegate)?.refreshUI() }
     }
 
     private func enforceFixedWindowSize(center: Bool) {

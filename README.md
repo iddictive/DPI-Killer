@@ -25,10 +25,10 @@ DPI Killer manages [ByeDPI](https://github.com/hufrea/byedpi) (`ciadpi`) and [Sp
 
 1. Download the DMG from [Releases](https://github.com/iddictive/DPI-Killer/releases/latest).
 2. Move `DPIKiller.app` to Applications and launch it.
-3. Choose ciadpi or SpoofDPI in Settings.
+3. Choose ciadpi or SpoofDPI in the menu bar or Settings.
 4. Start the proxy explicitly from the menu bar. Check the active port before connecting another client.
 
-Requires macOS 13 or newer. Release packaging uses an ad-hoc signature and does not notarize the app. macOS may require first-launch confirmation.
+Requires macOS 13 or newer. Version 4.0.4 uses an Apple development signature; it is not notarized. macOS may require first-launch confirmation. Helper setup requires a native administrator confirmation. Direct mode remains available without installing the helper.
 
 ## Features
 
@@ -45,9 +45,11 @@ Requires macOS 13 or newer. Release packaging uses an ad-hoc signature and does 
 | Mode | What DPI Killer does | What you need |
 | --- | --- | --- |
 | Local proxy (default) | Runs a loopback proxy without changing macOS proxy settings | A client configured for the displayed proxy type and runtime port |
-| System proxy (explicit) | Checks HTTPS through the backend, then configures the current network connection | An available connection without another active proxy |
+| System proxy (explicit) | Configures the current network connection after the local backend is ready | An available connection without another active proxy |
 
-The app restores the connection's prior proxy settings when stopped. If the backend fails its internet check, it stops before enabling the system proxy. A real packet-tunnel VPN is not provided by these modes.
+The app restores the connection's prior proxy settings when stopped. Temporary loss of internet does not recycle a healthy local backend. Repeated proxy failures trigger recovery only when the direct route works. A real packet-tunnel VPN is not provided by these modes.
+
+The menu's **System settings** selector chooses **Helper** (an installed privileged service for subsequent proxy/TTL changes) or **Direct** (macOS authorization for each privileged operation). The backend itself runs as the current user in both modes. A failed system-proxy operation shows an actionable warning rather than a green active state.
 
 For Shadowrocket, choose **Configure Shadowrocket** after installing ciadpi. For other clients, use `127.0.0.1` and the active port shown in DPI Killer, not just the configured preferred port.
 
@@ -58,7 +60,7 @@ For Shadowrocket, choose **Configure Shadowrocket** after installing ciadpi. For
 - **App:** launch at login, application updates, reconnection, and Shadowrocket setup.
 - **Manual:** extra arguments per engine and a preview of the launch command. Validation catches conflicts with options already managed by the interface.
 
-Use **Save** while stopped, or **Save & Restart** while running. Available controls depend on the selected engine.
+Settings apply automatically. Proxy-only changes keep the backend process; backend arguments restart it once. Invalid changes restore the prior settings and backend. Available controls and preset descriptions depend on the selected engine.
 
 ## Backend installation
 
@@ -82,6 +84,8 @@ open .build.noindex/DPIKiller.app
 ```
 
 Create a disk image with `./build.sh --dmg`. Application versions and backend versions are independent: updating ciadpi or SpoofDPI does not update DPI Killer itself.
+
+For a helper-capable local build, set `DPIKILLER_LOCAL_SIGN_IDENTITY` to an existing Apple signing identity. Unsigned source/CI builds use Direct authorization. Stable releases are created from a clean, committed `main` checkout with `scripts/release.sh <version> <notes-file>` and that signing identity. The script uploads a draft; verify the downloaded DMG and installed application before publishing. CI builds unsigned artifacts for compilation checks and never replaces the signed stable release. The updater preserves a running backend and requires the existing Apple signing team for updates from a signed installation.
 
 ## Troubleshooting
 
@@ -107,12 +111,12 @@ DPI Killer управляет локальным прокси для обход�
 3. Запустите прокси из строки меню. Само приложение открывается с выключенным прокси.
 4. Для подключения другого клиента используйте `127.0.0.1` и активный порт приложения: он может отличаться от заданного, если тот занят.
 
-Требуется macOS 13 или новее. Сборки имеют ad-hoc подпись без нотариализации Apple; при первом запуске может потребоваться подтверждение macOS.
+Требуется macOS 13 или новее. Версия 4.0.4 подписана сертификатом Apple Development без нотариализации; при первом запуске может потребоваться подтверждение macOS. Установка помощника требует подтверждения администратора. Режим **Напрямую** доступен без помощника.
 
 ### Настройки и режимы
 
-В **Backend** выбирается движок и проверяются его обновления. В **Network** находятся локальный порт, явное включение системного прокси, настройки обхода и DNS. Кнопка **Оптимизировать** отдельно устанавливает TTL 65 для раздачи интернета. В **App** находятся автозапуск, обновления и настройка Shadowrocket. **Manual** позволяет добавить аргументы отдельно для каждого движка. Настройки сохраняются кнопкой **Сохранить**; при работающем прокси кнопка перезапустит его.
+Движок и способ изменения системных настроек выбираются прямо в меню. В **Backend** также проверяются обновления движков. В **Network** находятся локальный порт, системный прокси, настройки обхода и DNS. Кнопка **Оптимизировать раздачу** отдельно устанавливает TTL 65. В **App** находятся автозапуск, обновления и настройка Shadowrocket. **Manual** позволяет добавить аргументы отдельно для каждого движка. Настройки применяются автоматически; неверные изменения откатываются. Пресеты объясняют параметры выбранного движка.
 
-По умолчанию движок работает только на `127.0.0.1` и не меняет сетевые настройки macOS. При явном включении системного прокси приложение сначала проверяет HTTPS через движок, затем меняет прокси только для текущего подключения и восстанавливает прежние значения при остановке. Если у подключения уже есть прокси, запуск в этом режиме отменяется. Настоящего VPN-туннеля в этих режимах нет.
+По умолчанию движок работает только на `127.0.0.1` и не меняет сетевые настройки macOS. Системный прокси меняется только для текущего подключения; прежние значения восстанавливаются при остановке. Чужой активный прокси не перезаписывается. Краткая потеря интернета не останавливает исправный движок. Помощник обслуживает только системные настройки, сам движок работает от обычного пользователя. Настоящего VPN-туннеля в этих режимах нет.
 
 Для сборки ciadpi нужны `cc` и `make` из Command Line Tools. SpoofDPI загружается из upstream-релиза. DNS-настройки доступны только для SpoofDPI. Для диагностики используйте Connectivity Diagnostics и Event Logs; результат обхода зависит от сети и выбранных параметров.

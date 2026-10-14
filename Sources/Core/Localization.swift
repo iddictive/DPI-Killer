@@ -12,9 +12,9 @@ struct L10n {
     var statusActive: String { isRussian ? "Статус: активно" : "Status: Active" }
     var statusPartial: String { isRussian ? "Статус: требует внимания" : "Status: Needs attention" }
     var statusStopped: String { isRussian ? "Статус: остановлено" : "Status: Stopped" }
-    var networkOptimizationActive: String { isRussian ? "TTL 65 установлен" : "TTL 65 is set" }
-    var networkOptimizationInactive: String { isRussian ? "TTL для раздачи не 65" : "Hotspot TTL is not 65" }
-    var networkOptimizationApply: String { isRussian ? "Установить TTL 65 для раздачи..." : "Set hotspot TTL to 65..." }
+    var networkOptimizationActive: String { isRussian ? "Оптимизация раздачи включена" : "Hotspot optimization is on" }
+    var networkOptimizationInactive: String { isRussian ? "Оптимизация раздачи выключена" : "Hotspot optimization is off" }
+    var networkOptimizationApply: String { isRussian ? "Оптимизировать раздачу" : "Optimize hotspot" }
     var networkOptimizationApplying: String { isRussian ? "Оптимизация сети..." : "Optimizing network..." }
     var menuRuntimeSection: String { isRussian ? "Состояние" : "Runtime" }
     var menuToolsSection: String { isRussian ? "Инструменты" : "Tools" }

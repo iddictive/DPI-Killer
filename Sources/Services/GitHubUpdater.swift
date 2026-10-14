@@ -429,6 +429,8 @@ final class GitHubUpdater {
         let logPath = "/tmp/DPIKillerUpdate.log"
         let executableName = (Bundle.main.infoDictionary?["CFBundleExecutable"] as? String) ?? "DPIKiller"
         let bundleID = Bundle.main.bundleIdentifier ?? "com.antigravity.DPIKiller"
+        let signingRequirement = (try? NetworkSettingsIdentity.requirement(identifier: bundleID)) ?? ""
+        let resumeProxy = DPIKillerManager.shared.isRunning ? "1" : "0"
         let readyFlag = FileManager.default.temporaryDirectory.appendingPathComponent("dpikiller_ready_\(UUID().uuidString).flag").path
         try? FileManager.default.removeItem(atPath: readyFlag)
 
@@ -442,6 +444,8 @@ final class GitHubUpdater {
         callingPID="$6"
         logPath="$7"
         readyFlag="$8"
+        signingRequirement="$9"
+        resumeProxy="${10}"
 
         mountPath=""
         workspaceDir=""
@@ -454,6 +458,14 @@ final class GitHubUpdater {
 
         log() {
            printf '%s %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$*"
+        }
+
+        reopen() {
+           if [ "$resumeProxy" = "1" ]; then
+               /usr/bin/open "$appPath" --args --start-proxy
+           else
+               /usr/bin/open "$appPath"
+           fi
         }
 
         rollback() {
@@ -482,7 +494,7 @@ final class GitHubUpdater {
                 log "Rollback failed: moving restored app into place failed; preserving backup in $backupAppPath"
                 return
             fi
-            /usr/bin/open "$appPath"
+            reopen
             log "Rollback succeeded, restored previous app"
         }
 
@@ -492,7 +504,7 @@ final class GitHubUpdater {
                if [ "$needsRollback" = "1" ]; then
                    rollback
                elif ! kill -0 "$callingPID" 2>/dev/null && [ -d "$appPath" ]; then
-                   /usr/bin/open "$appPath" || true
+                   reopen || true
                fi
            fi
            if [ -n "$mountPath" ] && [ -d "$mountPath" ]; then
@@ -536,8 +548,10 @@ final class GitHubUpdater {
         fi
 
         ditto "$sourceAppPath" "$stagedAppPath"
-        xattr -rc "$stagedAppPath" || true
         codesign --verify --deep --strict "$stagedAppPath"
+        if [ -n "$signingRequirement" ]; then
+            codesign --verify --strict -R "=$signingRequirement" "$stagedAppPath"
+        fi
 
         stagedBundleID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$stagedAppPath/Contents/Info.plist" 2>/dev/null || true)"
         if [ -n "$expectedBundleID" ] && [ "$stagedBundleID" != "$expectedBundleID" ]; then
@@ -575,7 +589,7 @@ final class GitHubUpdater {
         ditto "$stagedAppPath" "$appPath"
         log "Installed version $stagedVersion to $appPath"
 
-        /usr/bin/open "$appPath"
+        reopen
         smokePassed=0
         targetExecutable="$appPath/Contents/MacOS/$executableName"
         for _ in {1..30}; do
@@ -616,7 +630,9 @@ final class GitHubUpdater {
                 executableName,
                 String(pid),
                 logPath,
-                readyFlag
+                readyFlag,
+                signingRequirement,
+                resumeProxy
             ]
 
             do {
@@ -632,6 +648,15 @@ final class GitHubUpdater {
                     try? FileManager.default.removeItem(atPath: readyFlag)
                     DispatchQueue.main.async {
                         NSApp.terminate(nil)
+                    }
+                    process.waitUntilExit()
+                    // This code only survives when the application refused shutdown.
+                    DispatchQueue.main.async {
+                        self.isInstalling = false
+                        appDelegate?.loadingWindow?.closeWithFade {
+                            appDelegate?.loadingWindow = nil
+                            self.showUpdateFailureAlert(informativeText: L10n.shared.updateInstallFailedInfo)
+                        }
                     }
                 } else {
                     if process.isRunning {

@@ -119,6 +119,11 @@ final class SettingsStore {
         set { defaults.set(newValue, forKey: "systemProxyEnabled") }
     }
 
+    var networkSettingsMode: NetworkSettingsMode {
+        get { NetworkSettingsMode(rawValue: defaults.string(forKey: "networkSettingsMode") ?? "") ?? .helper }
+        set { defaults.set(newValue.rawValue, forKey: "networkSettingsMode") }
+    }
+
     var autoReconnect: Bool {
         get { defaults.object(forKey: "autoReconnect") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "autoReconnect") }
@@ -239,6 +244,7 @@ final class SettingsStore {
             disableIpv6: disableIpv6,
             autoReconnect: autoReconnect,
             systemProxyEnabled: systemProxyEnabled,
+            networkSettingsMode: networkSettingsMode,
             vpnClientCompatibilityEnabled: vpnClientCompatibilityEnabled,
             vpnModeEnabled: vpnModeEnabled
         )
@@ -271,6 +277,7 @@ final class SettingsStore {
         autoReconnect = draft.common.autoReconnect
         vpnClientCompatibilityEnabled = draft.common.vpnClientCompatibilityEnabled
         systemProxyEnabled = draft.common.systemProxyEnabled
+        networkSettingsMode = draft.common.networkSettingsMode
         vpnModeEnabled = draft.common.vpnModeEnabled && !draft.common.vpnClientCompatibilityEnabled
 
         defaultTTL = clampedString(draft.common.defaultTTL, defaultValue: 64, range: 1...255)
@@ -387,7 +394,7 @@ final class SettingsStore {
 
     func applyNetworkOptimization(completion: @escaping (Bool, String?) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
-            if NetworkSettingsClient.shared.isSupported {
+            if self.networkSettingsMode == .helper, NetworkSettingsClient.shared.isSupported {
                 let response = NetworkSettingsClient.shared.applyHotspotTTL()
                 DispatchQueue.main.async {
                     completion(response.error == nil && response.ttl == 65, response.error)

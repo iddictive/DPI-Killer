@@ -1,4 +1,4 @@
-name: Release
+name: Build
 
 on:
   push:
@@ -6,13 +6,14 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
-    name: Build and Release
+    name: Verify source build
     runs-on: macos-15
     if: github.event_name == 'workflow_dispatch' || github.actor != 'github-actions[bot]'
-    permissions:
-      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,43 +23,17 @@ jobs:
       - name: Show Xcode Version
         run: xcodebuild -version
 
-      - name: Clean DerivedData
-        run: rm -rf ~/Library/Developer/Xcode/DerivedData
-
-      - name: Calculate Version
-        id: versioning
-        run: |
-          source scripts/version.sh
-          APP_VERSION="$(next_release_version Info.plist)"
-          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
-          echo "VERSION=$APP_VERSION" >> $GITHUB_OUTPUT
-          DPIKILLER_VERSION="$APP_VERSION" resolve_dpikiller_version Info.plist
-
-      - name: Build App
-        id: build_app
-        run: |
-          DPIKILLER_VERSION="$APP_VERSION" SKIP_VERSION_BUMP=1 bash build.sh
-
-          APP_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" ".build.noindex/DPIKiller.app/Contents/Info.plist")
-          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
-          echo "VERSION=$APP_VERSION" >> $GITHUB_OUTPUT
-
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $APP_VERSION" ".build.noindex/DPIKiller.app/Contents/Info.plist" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_VERSION" ".build.noindex/DPIKiller.app/Contents/Info.plist"
-
-          # Re-sign after plist modification
-          codesign --force --deep --sign - .build.noindex/DPIKiller.app
+      - name: Build committed version
+        run: SKIP_VERSION_BUMP=1 bash build.sh
 
       - name: Create DMG
         run: |
           bash scripts/create_dmg.sh
 
-      - name: Release
-        uses: softprops/action-gh-release@v1
+      - name: Save unsigned CI artifact
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: v${{ env.APP_VERSION }}
-          name: DPI Killer v${{ env.APP_VERSION }}
-          files: DPIKiller.dmg
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: DPIKiller-unsigned-ci
+          path: DPIKiller.dmg
+          retention-days: 7
+      # Stable updates are signed and published by scripts/release.sh.

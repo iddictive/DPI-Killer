@@ -1,5 +1,6 @@
 import Foundation
 import ServiceManagement
+import Security
 
 /// Local development builds cannot register a bundled LaunchDaemon without
 /// notarization. Install the same signed, fixed-operation helper through the
@@ -19,14 +20,15 @@ enum NetworkHelperInstaller {
         if FileManager.default.fileExists(atPath: executable),
            FileManager.default.fileExists(atPath: plist),
            try run("/usr/bin/codesign", ["--verify", "--strict", "-R", "=" + requirement, executable]).status == 0,
-           try run("/usr/bin/cmp", ["-s", source, executable]).status == 0,
+           try codeDirectoryHash(source) == codeDirectoryHash(executable),
            try run("/bin/launchctl", ["print", "system/" + NetworkSettingsIdentity.helperIdentifier]).status == 0 {
             return
         }
         let label = NetworkSettingsIdentity.helperIdentifier
         let configuration: [String: Any] = [
             "Label": label, "ProgramArguments": [executable], "UserName": "root",
-            "MachServices": [label: true], "RunAtLoad": true
+            "MachServices": [label: true], "RunAtLoad": true,
+            "AssociatedBundleIdentifiers": [NetworkSettingsIdentity.appIdentifier]
         ]
         let data = try PropertyListSerialization.data(fromPropertyList: configuration, format: .xml, options: 0)
         let xml = String(decoding: data, as: UTF8.self)
@@ -114,6 +116,22 @@ enum NetworkHelperInstaller {
     }
 
     private static func quote(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'" }
+
+    private static func codeDirectoryHash(_ path: String) throws -> Data {
+        var code: SecStaticCode?
+        let opened = SecStaticCodeCreateWithPath(URL(fileURLWithPath: path) as CFURL, [], &code)
+        guard opened == errSecSuccess, let code else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(opened))
+        }
+        var information: CFDictionary?
+        let inspected = SecCodeCopySigningInformation(code, SecCSFlags(rawValue: kSecCSSigningInformation), &information)
+        guard inspected == errSecSuccess,
+              let hash = (information as? [String: Any])?[kSecCodeInfoUnique as String] as? Data else {
+            throw NSError(domain: NetworkSettingsIdentity.helperIdentifier, code: Int(inspected),
+                          userInfo: [NSLocalizedDescriptionKey: "Could not compare the signed network helper code."])
+        }
+        return hash
+    }
 
     private static func run(_ path: String, _ arguments: [String]) throws -> (status: Int32, output: String) {
         let process = Process()

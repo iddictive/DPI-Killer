@@ -11,6 +11,8 @@ enum BackendSelection: String {
     case spoofdpi
     case dual
     case custom
+
+    static var selectableEngines: [BackendSelection] { [.ciadpi, .spoofdpi] }
 }
 
 enum BypassEngine: String {

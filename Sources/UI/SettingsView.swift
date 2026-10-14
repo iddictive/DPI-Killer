@@ -352,7 +352,20 @@ struct SettingsView: View {
             Toggle(L10n.shared.descSystemProxy, isOn: $viewModel.systemProxyEnabled)
                 .toggleStyle(.checkbox)
 
-            if NetworkSettingsClient.shared.isSupported, NetworkSettingsClient.shared.needsApproval {
+            SettingsRow(text(ru: "Системные настройки:", en: "System settings:")) {
+                Picker("", selection: $viewModel.networkSettingsMode) {
+                    ForEach(NetworkSettingsMode.allCases) { mode in Text(mode.title).tag(mode) }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+            }
+
+            Text(viewModel.networkSettingsMode.detail)
+                .font(DPISettingsTokens.captionFont)
+                .foregroundStyle(DPISettingsTokens.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if viewModel.networkSettingsMode == .helper, NetworkSettingsClient.shared.isSupported, NetworkSettingsClient.shared.needsApproval {
                 Button(text(ru: "Разрешить сетевой помощник в macOS", en: "Approve network helper in macOS")) {
                     NetworkSettingsClient.shared.openApprovalSettings()
                 }
@@ -738,6 +751,7 @@ final class SettingsViewModel: ObservableObject {
     @Published var disableIpv6: Bool
     @Published var autoReconnect: Bool
     @Published var systemProxyEnabled: Bool
+    @Published var networkSettingsMode: NetworkSettingsMode
     @Published var vpnClientCompatibilityEnabled: Bool
     @Published var vpnModeEnabled: Bool
     @Published var ciadpiManualArgs: String
@@ -765,7 +779,7 @@ final class SettingsViewModel: ObservableObject {
     @Published private var runtimePort: Int?
     @Published private var runtimeCiadpiPort: Int?
 
-    let backendSelections: [BackendSelection] = [.ciadpi, .spoofdpi]
+    let backendSelections = BackendSelection.selectableEngines
     let splitModes = ["sni", "random", "chunk", "none"]
     let dnsModes = ["udp", "https", "system"]
     let options: [SettingsArgumentOption] = [
@@ -812,6 +826,7 @@ final class SettingsViewModel: ObservableObject {
         disableIpv6 = draft.common.disableIpv6
         autoReconnect = draft.common.autoReconnect
         systemProxyEnabled = draft.common.systemProxyEnabled
+        networkSettingsMode = draft.common.networkSettingsMode
         vpnClientCompatibilityEnabled = draft.common.vpnClientCompatibilityEnabled
         vpnModeEnabled = draft.common.vpnModeEnabled
         ciadpiManualArgs = draft.ciadpi.manualArgs
@@ -901,7 +916,7 @@ final class SettingsViewModel: ObservableObject {
     }
 
     var runtimeStatusTitle: String {
-        if DPIKillerManager.shared.runtimeStatus == .needsAttention { return L10n.shared.statusPartial }
+        if DPIKillerManager.shared.runtimeStatus == .needsAttention { return DPIKillerManager.shared.runtimeStatusTitle }
         guard backendRunning else { return L10n.shared.statusStopped }
         let portSuffix = backendRunning ? " • Port \(runtimePort ?? DPIKillerManager.shared.proxyPort)" : ""
         return (SystemProxyController.shared.hasLease ? L10n.shared.runtimeModeProxy : L10n.shared.runtimeModeLocalProxy) + portSuffix
@@ -1026,7 +1041,7 @@ final class SettingsViewModel: ObservableObject {
     }
 
     var footerStatusText: String? {
-        validationIssue ?? footerStatus
+        validationIssue ?? DPIKillerManager.shared.runtimeIssue ?? footerStatus
     }
 
     func title(for selection: BackendSelection) -> String {
@@ -1383,6 +1398,7 @@ final class SettingsViewModel: ObservableObject {
             disableIpv6: disableIpv6,
             autoReconnect: autoReconnect,
             systemProxyEnabled: systemProxyEnabled,
+            networkSettingsMode: networkSettingsMode,
             vpnClientCompatibilityEnabled: sanitizedVPNClientCompatibility,
             vpnModeEnabled: vpnModeEnabled && vpnAvailable && !sanitizedVPNClientCompatibility
         )
@@ -1450,7 +1466,7 @@ final class SettingsViewModel: ObservableObject {
         }
         guard wasRunning else { finish(true, nil); return }
         DPIKillerManager.shared.reconfigure(restartBackend: restart) { success, error in
-            if NetworkSettingsClient.shared.isSupported, NetworkSettingsClient.shared.needsApproval {
+            if saved.common.networkSettingsMode == .helper, NetworkSettingsClient.shared.isSupported, NetworkSettingsClient.shared.needsApproval {
                 finish(true, NetworkSettingsClient.shared.approvalMessage)
                 return
             }
@@ -1490,6 +1506,7 @@ final class SettingsViewModel: ObservableObject {
         disableIpv6 = draft.common.disableIpv6
         autoReconnect = draft.common.autoReconnect
         systemProxyEnabled = draft.common.systemProxyEnabled
+        networkSettingsMode = draft.common.networkSettingsMode
         vpnClientCompatibilityEnabled = draft.common.vpnClientCompatibilityEnabled
         vpnModeEnabled = draft.common.vpnModeEnabled
         ciadpiManualArgs = draft.ciadpi.manualArgs

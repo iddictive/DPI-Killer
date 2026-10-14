@@ -161,11 +161,7 @@ guard getuid() == 0 else {
 
 do {
     let requirement = try NetworkSettingsIdentity.requirement(identifier: NetworkSettingsIdentity.appIdentifier)
-    guard let defaults = UserDefaults(suiteName: NetworkSettingsIdentity.machServiceName) else {
-        AppLogger.log("[NetworkHelper] Could not open proxy recovery preferences.")
-        exit(EXIT_FAILURE)
-    }
-    let server = NetworkSettingsServer(controller: SystemProxyController(defaults: defaults, privileged: true),
+    let server = NetworkSettingsServer(controller: SystemProxyController(defaults: .standard, privileged: true),
                                        clientRequirement: requirement)
     server.recoverOnStartup()
     let listener = NSXPCListener(machServiceName: NetworkSettingsIdentity.machServiceName)

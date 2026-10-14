@@ -89,6 +89,23 @@ struct BackendCapability {
     }
 }
 
+enum NetworkSettingsMode: String, CaseIterable, Identifiable {
+    case helper, manual
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .helper: return L10n.shared.isRussian ? "Помощник" : "Helper"
+        case .manual: return L10n.shared.isRussian ? "Напрямую" : "Direct"
+        }
+    }
+    var detail: String {
+        switch self {
+        case .helper: return L10n.shared.isRussian ? "Встроенный помощник меняет системные настройки без повторных запросов. Требуется разрешить его фоновую работу в macOS." : "The bundled helper changes system settings without repeated prompts. Allow its background activity in macOS."
+        case .manual: return L10n.shared.isRussian ? "Приложение меняет настройки напрямую. macOS может запрашивать пароль администратора при изменениях." : "The app changes settings directly. macOS may request administrator confirmation when settings change."
+        }
+    }
+}
+
 struct CommonSettings: Equatable {
     var localPort: String
     var defaultTTL: String
@@ -105,6 +122,7 @@ struct CommonSettings: Equatable {
     var disableIpv6: Bool
     var autoReconnect: Bool
     var systemProxyEnabled: Bool
+    var networkSettingsMode: NetworkSettingsMode = .helper
     var vpnClientCompatibilityEnabled: Bool
     var vpnModeEnabled: Bool
 }

@@ -2,7 +2,12 @@
 
 Outcome: keep the existing hotspot TTL 65 setup and a usable local proxy through
 start, stop, restart and network recovery. Scope is manager, connectivity and
-proxy restoration, including the installed app. No public release is requested.
+proxy restoration, including the installed app. The initial repair scope was
+local; the user subsequently authorized GitHub delivery and release 4.0.4.
+
+Current completion report: [repair-report-4.0.4.md](repair-report-4.0.4.md).
+The checkpoints below retain intermediate evidence; earlier pending approval
+notes are superseded by the working signed helper and Direct/Helper selection.
 
 Observed: five children of the installed app still listen after stop/recycle;
 ciadpi 17.3 survives SIGTERM even in an independent default-signal launch. Initial

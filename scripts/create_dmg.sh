@@ -1,5 +1,6 @@
 #!/bin/bash
 # scripts/create_dmg.sh
+set -euo pipefail
 
 APP_NAME="DPIKiller"
 APP_BUNDLE=".build.noindex/${APP_NAME}.app"
@@ -22,7 +23,7 @@ rm -rf "${DMG_TEMP_DIR}"
 mkdir -p "${DMG_TEMP_DIR}"
 
 # Copy the app bundle
-cp -R "${APP_BUNDLE}" "${DMG_TEMP_DIR}/"
+ditto "${APP_BUNDLE}" "${DMG_TEMP_DIR}/${APP_NAME}.app"
 
 # Create a symlink to Applications
 ln -s /Applications "${DMG_TEMP_DIR}/Applications"

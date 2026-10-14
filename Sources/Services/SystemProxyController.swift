@@ -49,7 +49,7 @@ final class SystemProxyController {
         #if DPIKILLER_NETWORK_HELPER
         return false
         #else
-        return !privileged && NetworkSettingsClient.shared.isSupported
+        return !privileged && SettingsStore.shared.networkSettingsMode == .helper && NetworkSettingsClient.shared.isSupported
         #endif
     }
     private(set) var lastError: String? {
@@ -67,7 +67,7 @@ final class SystemProxyController {
 
     var hasLease: Bool {
         #if !DPIKILLER_NETWORK_HELPER
-        if usesNetworkHelper { return NetworkSettingsClient.shared.hasLease }
+        if NetworkSettingsClient.shared.isSupported, NetworkSettingsClient.shared.hasLease { return true }
         #endif
         // UserDefaults reads are thread-safe. UI must not wait on the
         // transaction lock while macOS is showing an authorization prompt.
@@ -173,12 +173,23 @@ final class SystemProxyController {
     @discardableResult
     func restore() -> Bool {
         #if !DPIKILLER_NETWORK_HELPER
-        if usesNetworkHelper {
+        if usesNetworkHelper, !SettingsStore.shared.usesSystemProxy,
+           !NetworkSettingsClient.shared.hasLease, !NetworkSettingsClient.shared.needsRecovery,
+           defaults.data(forKey: leaseKey) == nil { return true }
+        if usesNetworkHelper || (!privileged && NetworkSettingsClient.shared.hasLease) || (!privileged && NetworkSettingsClient.shared.needsRecovery) {
+            if NetworkSettingsClient.shared.needsApproval, !NetworkSettingsClient.shared.hasLease,
+               !NetworkSettingsClient.shared.needsRecovery, defaults.data(forKey: leaseKey) != nil {
+                return restoreDirect()
+            }
             let response = NetworkSettingsClient.shared.restoreProxy(legacyLease: defaults.data(forKey: leaseKey))
             finishHelperResponse(response)
             return response.error == nil
         }
         #endif
+        return restoreDirect()
+    }
+
+    private func restoreDirect() -> Bool {
         lock.lock()
         defer { lock.unlock() }
 

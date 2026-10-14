@@ -129,6 +129,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.iconCache[runtimeStatus] = self.createStatusIcon(status: runtimeStatus)
                 }
                 button.image = self.iconCache[runtimeStatus]
+                button.toolTip = DPIKillerManager.shared.runtimeIssue ?? DPIKillerManager.shared.runtimeStatusTitle
                 button.imagePosition = .imageOnly
             }
             self.setupMenu()
@@ -320,10 +321,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             : statusTitle(for: runtimeStatus)
         if lastMenuStatus != runtimeStatus {
             lastMenuStatus = runtimeStatus
-            AppLogger.log("[Runtime] Menu status=\(runtimeStatus), title=\(status), pid=\(DPIKillerManager.shared.process?.processIdentifier ?? 0), issue=\(DPIKillerManager.shared.runtimeIssue ?? "none").")
+            AppLogger.log("[Runtime] State=\(runtimeStatus), mode=\(status), pid=\(DPIKillerManager.shared.process?.processIdentifier ?? 0), issue=\(DPIKillerManager.shared.runtimeIssue ?? "none").")
         }
-        menu.addItem(disabledMenuItem(title: status))
+        if runtimeStatus == .needsAttention {
+            let recovery = actionMenuItem(title: status + "…", action: #selector(resolveNetworkIssue), key: "")
+            recovery.toolTip = DPIKillerManager.shared.runtimeIssue
+            menu.addItem(recovery)
+        }
         menu.addItem(actionMenuItem(title: isModeRunning() ? L10n.shared.stop : L10n.shared.start, action: #selector(toggle), key: "t"))
+
+        let systemProxy = actionMenuItem(title: L10n.shared.runtimeModeProxy, action: #selector(toggleSystemProxy), key: "")
+        systemProxy.state = SettingsStore.shared.usesSystemProxy ? .on : .off
+        menu.addItem(systemProxy)
+
+        let optimized = SettingsStore.shared.isNetworkOptimizationApplied()
+        let optimize = actionMenuItem(title: optimized ? L10n.shared.networkOptimizationActive : L10n.shared.networkOptimizationApply,
+                                     action: #selector(applyNetworkOptimization), key: "")
+        optimize.state = optimized ? .on : .off
+        optimize.isEnabled = !optimized
+        optimize.toolTip = optimized ? L10n.shared.networkOptimizationActive : "TTL 65"
+        menu.addItem(optimize)
+
+        menu.addItem(NSMenuItem.separator())
+        let modes = NetworkSettingsMode.allCases
+        let permissions = segmentedMenuItem(title: L10n.shared.isRussian ? "Системные настройки" : "System settings",
+                                            labels: modes.map(\.title),
+                                            selected: modes.firstIndex(of: SettingsStore.shared.networkSettingsMode) ?? 0,
+                                            action: #selector(changeNetworkSettingsMode(_:)),
+                                            help: SettingsStore.shared.networkSettingsMode.detail)
+        menu.addItem(permissions)
+        let backends = BackendSelection.selectableEngines
+        let engineSelection: BackendSelection = SettingsStore.shared.resolvedEngine == .ciadpi ? .ciadpi : .spoofdpi
+        menu.addItem(segmentedMenuItem(title: L10n.shared.sectionBackend,
+                                      labels: backends.map(\.rawValue),
+                                      selected: backends.firstIndex(of: engineSelection) ?? 0,
+                                      action: #selector(changeBackendSelection(_:))))
 
         menu.addItem(NSMenuItem.separator())
         menu.addItem(actionMenuItem(title: L10n.shared.settings, action: #selector(showSettings), key: ","))
@@ -334,14 +366,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         toolsMenu.addItem(actionMenuItem(title: L10n.shared.diagTitle, action: #selector(runDiagnostics), key: "d"))
         toolsMenu.addItem(actionMenuItem(title: L10n.shared.speedTest, action: #selector(showSpeedTest), key: "s"))
         toolsMenu.addItem(actionMenuItem(title: L10n.shared.logsTitle, action: #selector(showLogs), key: "l"))
-        if !SettingsStore.shared.isNetworkOptimizationApplied() {
-            toolsMenu.addItem(NSMenuItem.separator())
-            toolsMenu.addItem(actionMenuItem(title: L10n.shared.networkOptimizationApply, action: #selector(applyNetworkOptimization), key: ""))
-        }
+        toolsMenu.addItem(NSMenuItem.separator())
+        toolsMenu.addItem(actionMenuItem(title: L10n.shared.updateCheck, action: #selector(checkUpdate), key: "u"))
+        toolsMenu.addItem(actionMenuItem(title: L10n.shared.instructions, action: #selector(showHelp), key: "h"))
         toolsItem.submenu = toolsMenu
         menu.addItem(toolsItem)
-        menu.addItem(actionMenuItem(title: L10n.shared.updateCheck, action: #selector(checkUpdate), key: "u"))
-        menu.addItem(actionMenuItem(title: L10n.shared.instructions, action: #selector(showHelp), key: "h"))
 
         menu.addItem(NSMenuItem.separator())
         let quitItem = NSMenuItem(title: L10n.shared.quit, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
@@ -349,6 +378,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         quitItem.isEnabled = true
         menu.addItem(quitItem)
         statusItem?.menu = menu
+    }
+
+    private func segmentedMenuItem(title: String, labels: [String], selected: Int, action: Selector, help: String? = nil) -> NSMenuItem {
+        let item = NSMenuItem()
+        let selector = NSSegmentedControl(labels: labels, trackingMode: .selectOne, target: self, action: action)
+        selector.controlSize = .small
+        selector.segmentStyle = .rounded
+        selector.selectedSegment = selected
+        selector.setAccessibilityLabel(title)
+        selector.toolTip = help
+        let width: CGFloat = 200
+        for index in labels.indices { selector.setWidth(width / CGFloat(labels.count), forSegment: index) }
+        selector.frame = NSRect(x: 28, y: 6, width: width, height: 22)
+        let row = NSView(frame: NSRect(x: 0, y: 0, width: width + 48, height: 49))
+        let label = NSTextField(labelWithString: title)
+        label.font = .systemFont(ofSize: 11)
+        label.textColor = .secondaryLabelColor
+        label.frame = NSRect(x: 28, y: 31, width: width, height: 14)
+        row.addSubview(label)
+        row.addSubview(selector)
+        item.view = row
+        return item
     }
 
     private func disabledMenuItem(title: String) -> NSMenuItem {
@@ -406,6 +457,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DPIKillerManager.shared.runtimeStatus
     }
 
+    @objc private func changeNetworkSettingsMode(_ sender: NSSegmentedControl) {
+        let modes = NetworkSettingsMode.allCases
+        guard modes.indices.contains(sender.selectedSegment) else { return }
+        let mode = modes[sender.selectedSegment]
+        statusItem?.menu?.cancelTracking()
+        if settingsWindow == nil { settingsWindow = SettingsWindowController() }
+        settingsWindow?.setNetworkSettingsMode(mode)
+    }
+
+    @objc private func toggleSystemProxy() {
+        if settingsWindow == nil { settingsWindow = SettingsWindowController() }
+        settingsWindow?.setSystemProxyEnabled(!SettingsStore.shared.usesSystemProxy)
+    }
+
+    @objc private func changeBackendSelection(_ sender: NSSegmentedControl) {
+        let backends = BackendSelection.selectableEngines
+        guard backends.indices.contains(sender.selectedSegment) else { return }
+        statusItem?.menu?.cancelTracking()
+        if settingsWindow == nil { settingsWindow = SettingsWindowController() }
+        settingsWindow?.setBackendSelection(backends[sender.selectedSegment])
+    }
+
+    @objc private func resolveNetworkIssue() {
+        if settingsWindow == nil { settingsWindow = SettingsWindowController() }
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow?.showNetworkSettings()
+        if SettingsStore.shared.networkSettingsMode == .helper, NetworkSettingsClient.shared.needsApproval {
+            NetworkSettingsClient.shared.openApprovalSettings()
+        } else if DPIKillerManager.shared.process?.isRunning == true {
+            DPIKillerManager.shared.reconfigure(restartBackend: false) { [weak self] success, error in
+                self?.settingsWindow?.reportNetworkResult(success: success, error: error)
+            }
+        } else if SystemProxyController.shared.hasLease || NetworkSettingsClient.shared.needsRecovery {
+            DPIKillerManager.shared.stopAsync { [weak self] success, error in
+                self?.settingsWindow?.reportNetworkResult(success: success, error: error)
+            }
+        }
+    }
+
     func restartRuntime() {
         TunnelManager.shared.stop()
         DPIKillerManager.shared.reconfigure(restartBackend: true) { [weak self] success, error in
@@ -427,7 +517,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .stopped:
             return L10n.shared.statusStopped
         case .needsAttention:
-            return L10n.shared.statusPartial
+            return DPIKillerManager.shared.runtimeStatusTitle
         case .localProxy:
             return L10n.shared.runtimeModeLocalProxy
         case .systemProxy:

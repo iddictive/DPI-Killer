@@ -15,6 +15,18 @@ final class DPIKillerManager {
         guard isRunning else { return .stopped }
         return SystemProxyController.shared.hasLease ? .systemProxy : .localProxy
     }
+    var runtimeStatusTitle: String {
+        switch runtimeStatus {
+        case .stopped: return L10n.shared.statusStopped
+        case .localProxy: return L10n.shared.runtimeModeLocalProxy
+        case .systemProxy: return L10n.shared.statusActive
+        case .needsAttention:
+            if SettingsStore.shared.networkSettingsMode == .helper, NetworkSettingsClient.shared.needsApproval {
+                return L10n.shared.isRussian ? "Разрешить DPI Killer в macOS" : "Allow DPI Killer in macOS"
+            }
+            return L10n.shared.isRussian ? "Проверить системный прокси" : "Check system proxy"
+        }
+    }
 
     private(set) var process: Process?
     private var installProcess: Process?
@@ -83,7 +95,8 @@ final class DPIKillerManager {
             (NSApp.delegate as? AppDelegate)?.refreshUI()
         }
         NetworkSettingsClient.shared.onReady = { [weak self] in
-            guard let self, self.isRunning, SettingsStore.shared.usesSystemProxy || self.forceSystemProxyOverride else { return }
+            guard let self, self.isRunning, SettingsStore.shared.networkSettingsMode == .helper,
+                  SettingsStore.shared.usesSystemProxy || self.forceSystemProxyOverride else { return }
             self.reconfigure(restartBackend: false) { success, error in
                 (NSApp.delegate as? AppDelegate)?.settingsWindow?.reportNetworkResult(success: success, error: error)
             }

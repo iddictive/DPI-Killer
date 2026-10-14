@@ -10,6 +10,7 @@ final class NetworkSettingsClient {
     private let service = SMAppService.daemon(plistName: NetworkSettingsIdentity.launchDaemonPlistName)
     private var connection: NSXPCConnection?
     private var lease = false
+    private var recoveryRequired = false
     private var pending = false
     private var approvalTimer: DispatchSourceTimer?
     private var didOpenApproval = false
@@ -29,6 +30,11 @@ final class NetworkSettingsClient {
     var hasLease: Bool {
         stateLock.lock(); defer { stateLock.unlock() }
         return lease
+    }
+
+    var needsRecovery: Bool {
+        stateLock.lock(); defer { stateLock.unlock() }
+        return recoveryRequired
     }
 
     var needsApproval: Bool {
@@ -80,7 +86,7 @@ final class NetworkSettingsClient {
 
     private func request(enroll: Bool, operation: (NetworkSettingsProtocol, @escaping (Data) -> Void) -> Void) -> NetworkSettingsResponse {
         queue.sync {
-            if serviceStatus != .enabled, !enroll, !hasLease {
+            if serviceStatus != .enabled, !enroll, !hasLease, !needsRecovery {
                 return NetworkSettingsResponse(error: nil, hasLease: false, legacyLeaseImported: false, ttl: nil)
             }
             do {
@@ -112,6 +118,7 @@ final class NetworkSettingsClient {
                             self.connection = nil
                             self.stateLock.lock()
                             let hadLease = self.lease
+                            self.recoveryRequired = self.recoveryRequired || hadLease
                             self.lease = false
                             self.stateLock.unlock()
                             client?.invalidate()
@@ -152,7 +159,11 @@ final class NetworkSettingsClient {
                     return failure("Network helper request timed out; recovery state retained.")
                 }
                 resultLock.lock(); let response = result!; resultLock.unlock()
-                stateLock.lock(); lease = response.hasLease; pending = false; stateLock.unlock()
+                stateLock.lock()
+                lease = response.hasLease
+                if response.error == nil { recoveryRequired = false }
+                pending = false
+                stateLock.unlock()
                 return response
             } catch {
                 let native = error as NSError
