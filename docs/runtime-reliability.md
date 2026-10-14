@@ -47,7 +47,14 @@ endpoint left the complete native network dictionary unchanged.
 The installed candidate handled 144 paired direct/proxy requests over 143 seconds
 with one unchanged backend process. There were nine failing pairs on both routes
 and no proxy-only failures. A bounded recovery probe subsequently timed out on
-both routes too. This establishes a separate connection problem; it does not
-prove its carrier/router cause or close hotspot throughput acceptance. These
+both routes too. This does not isolate the cause of those interruptions or
+close hotspot throughput acceptance. These
 measurements ran on a router connection; hotspot throughput still needs replay
 after reconnecting to the intended phone network.
+
+Final installed replay on the requested current Wi-Fi: 144 direct/proxy requests
+over 130 seconds, no failed requests on either path, one unchanged process and
+one listener on port 18082. TTL remains 65 and the stale lease is absent. The
+installed executable SHA-256 is
+`b4de4ee541402db0835843aaf1139ee7774ad2900c605b80672d016f6b5d3be1`.
+The app is left running; no Wi-Fi network selection was performed.
