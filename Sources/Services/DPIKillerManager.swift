@@ -241,6 +241,7 @@ final class DPIKillerManager {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: binaryPath)
         process.arguments = SettingsStore.shared.launchArguments(for: binaryPath, port: port)
+        process.environment = engine.processEnvironment(dnsMode: SettingsStore.shared.dnsMode)
 
         let pipe = Pipe()
         let startupOutputLock = NSLock()
@@ -267,7 +268,7 @@ final class DPIKillerManager {
         process.standardOutput = pipe
         process.standardError = pipe
 
-        pipe.fileHandleForReading.readabilityHandler = { handle in
+        pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             if data.isEmpty {
                 handle.readabilityHandler = nil
@@ -275,11 +276,7 @@ final class DPIKillerManager {
             }
             if let str = String(data: data, encoding: .utf8), !str.isEmpty {
                 captureStartupOutput(str)
-                let shouldStore = LogStore.shared.shouldCaptureProcessLogs()
-                    || SettingsStore.shared.selectedFlags.contains("--debug")
-                if shouldStore {
-                    LogStore.shared.append(str)
-                }
+                self?.recordBackendOutput(str, engine: engine)
             }
         }
 
@@ -434,6 +431,17 @@ final class DPIKillerManager {
     private func proxyPassesInternetCheck(engine: BypassEngine, port: Int) -> Bool {
         let proxy = "\(engine.proxyMode == .socks ? "socks5h" : "http")://127.0.0.1:\(port)"
         return internetPassesCheck(proxy: proxy)
+    }
+
+    private func recordBackendOutput(_ text: String, engine: BypassEngine) {
+        if LogStore.shared.shouldCaptureProcessLogs() || SettingsStore.shared.selectedFlags(for: engine).contains("--debug") {
+            LogStore.shared.append(text)
+            return
+        }
+        let errors = text.components(separatedBy: .newlines).filter {
+            $0.range(of: "\\b(ERR|ERROR|FATAL|PANIC)\\b|\\berr=", options: [.regularExpression, .caseInsensitive]) != nil
+        }
+        if !errors.isEmpty { LogStore.shared.append(errors.joined(separator: "\n")) }
     }
 
     private func internetPassesCheck(proxy: String? = nil) -> Bool {
@@ -1001,6 +1009,7 @@ final class DPIKillerManager {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: binaryPath)
         process.arguments = SettingsStore.shared.launchArguments(for: binaryPath, port: port)
+        process.environment = engine.processEnvironment(dnsMode: SettingsStore.shared.dnsMode)
         AppLogger.log("[Manager] Dual launching backend on port.")
         let pipe = Pipe()
         process.standardOutput = pipe
@@ -1013,11 +1022,7 @@ final class DPIKillerManager {
             }
             guard let str = String(data: data, encoding: .utf8), !str.isEmpty else { return }
             self?.appendDualOutput(engine: engine, text: str)
-            let shouldStore = LogStore.shared.shouldCaptureProcessLogs()
-                || SettingsStore.shared.selectedFlags.contains("--debug")
-            if shouldStore {
-                LogStore.shared.append(str)
-            }
+            self?.recordBackendOutput(str, engine: engine)
         }
         process.terminationHandler = { [weak self, weak process] _ in
             DispatchQueue.main.async {

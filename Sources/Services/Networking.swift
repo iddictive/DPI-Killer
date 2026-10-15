@@ -240,13 +240,20 @@ final class DiagnosticsManager: NSObject {
         config.timeoutIntervalForRequest = 5.0
 
         let session = URLSession(configuration: config)
+        let engine = SettingsStore.shared.resolvedEngine
+        let port = DPIKillerManager.shared.proxyPort
+        let startedAt = Date()
+        AppLogger.log("[Diagnostics] HTTPS request: engine=\(engine.rawValue), route=\(engine.proxyDescription), port=\(port), target=\(url.absoluteString).")
         session.dataTask(with: url) { _, response, error in
             defer { session.finishTasksAndInvalidate() }
             if let error {
+                let native = error as NSError
+                AppLogger.log("[Diagnostics] Failed: domain=\(native.domain), code=\(native.code), elapsed=\(String(format: "%.2f", Date().timeIntervalSince(startedAt)))s, detail=\(native.localizedDescription).")
                 completion(false, error.localizedDescription)
                 return
             }
             if let httpResponse = response as? HTTPURLResponse {
+                AppLogger.log("[Diagnostics] Response: HTTP \(httpResponse.statusCode), elapsed=\(String(format: "%.2f", Date().timeIntervalSince(startedAt)))s.")
                 if httpResponse.statusCode == 200 {
                     completion(true, nil)
                 } else {
