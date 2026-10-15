@@ -66,25 +66,8 @@ final class SpoofdpiUpdater {
     }
 
     private func version(at path: String) -> String? {
-        guard FileManager.default.isExecutableFile(atPath: path) else { return nil }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: path)
-        process.arguments = ["--version"]
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            guard let output = String(data: data, encoding: .utf8) else { return nil }
-            return Self.parseVersion(from: output)
-        } catch {
-            return nil
-        }
+        guard let output = SettingsStore.shared.backendProbeOutput(binaryPath: path, arguments: ["--version"]) else { return nil }
+        return Self.parseVersion(from: output)
     }
 
     private func fetchLatestRelease(completion: @escaping (Result<Release, Error>) -> Void) {

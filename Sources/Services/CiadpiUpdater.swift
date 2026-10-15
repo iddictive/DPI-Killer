@@ -194,26 +194,9 @@ final class CiadpiUpdater {
     }
 
     private func version(at path: String) -> String? {
-        guard FileManager.default.isExecutableFile(atPath: path) else { return nil }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: path)
-        process.arguments = ["--version"]
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            return output?.isEmpty == false ? output : nil
-        } catch {
-            return nil
-        }
+        guard let output = SettingsStore.shared.backendProbeOutput(binaryPath: path, arguments: ["--version"])?
+            .trimmingCharacters(in: .whitespacesAndNewlines) else { return nil }
+        return output.isEmpty ? nil : output
     }
 
     private func clearQuarantine(at url: URL) {

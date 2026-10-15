@@ -1,4 +1,5 @@
 import Cocoa
+import Darwin
 import Foundation
 
 final class SettingsStore {
@@ -814,23 +815,10 @@ final class SettingsStore {
     }
 
     private func sysctlIntValue(_ name: String) -> Int? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/sysctl")
-        process.arguments = ["-n", name]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            return Int(output ?? "")
-        } catch {
-            return nil
-        }
+        var value: Int32 = 0
+        var size = MemoryLayout.size(ofValue: value)
+        guard sysctlbyname(name, &value, &size, nil, 0) == 0 else { return nil }
+        return Int(value)
     }
 
     private func toggleLaunchAtLogin(_ enabled: Bool) {
@@ -852,8 +840,8 @@ final class SettingsStore {
         ["--system-proxy", "--silent", "--dns-ipv4-only", "--debug", "--policy-auto", "--no-tui"]
     }
 
-    private static var ciadpiHelpCache: [String: (mtime: Date?, output: String)] = [:]
-    private static let ciadpiHelpCacheLock = NSLock()
+    private static var backendProbeCache: [String: (mtime: Date?, output: String)] = [:]
+    private static let backendProbeCacheLock = NSLock()
 
     /// Long options supported by the installed ciadpi binary, parsed from `--help`.
     /// Nil when the binary is missing or its help cannot be read; callers keep
@@ -899,28 +887,34 @@ final class SettingsStore {
     }
 
     private func ciadpiHelpOutput(binaryPath: String) -> String? {
+        backendProbeOutput(binaryPath: binaryPath, arguments: ["--help"])
+    }
+
+    func backendProbeOutput(binaryPath: String, arguments: [String]) -> String? {
         guard FileManager.default.isExecutableFile(atPath: binaryPath) else { return nil }
         let mtime = (try? FileManager.default.attributesOfItem(atPath: binaryPath))?[.modificationDate] as? Date
-        Self.ciadpiHelpCacheLock.lock()
-        let cached = Self.ciadpiHelpCache[binaryPath]
-        Self.ciadpiHelpCacheLock.unlock()
+        let key = ([binaryPath] + arguments).joined(separator: "\0")
+        Self.backendProbeCacheLock.lock()
+        let cached = Self.backendProbeCache[key]
+        Self.backendProbeCacheLock.unlock()
         if let cached, cached.mtime == mtime {
             return cached.output
         }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: binaryPath)
-        process.arguments = ["--help"]
+        process.arguments = arguments
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = pipe
         do {
             try process.run()
-            process.waitUntilExit()
+            // Pipe EOF supplies the complete result without pumping the main run loop.
+            // waitUntilExit re-enters SwiftUI's layout transaction when called by a preview.
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             guard let output = String(data: data, encoding: .utf8), !output.isEmpty else { return nil }
-            Self.ciadpiHelpCacheLock.lock()
-            Self.ciadpiHelpCache[binaryPath] = (mtime, output)
-            Self.ciadpiHelpCacheLock.unlock()
+            Self.backendProbeCacheLock.lock()
+            Self.backendProbeCache[key] = (mtime, output)
+            Self.backendProbeCacheLock.unlock()
             return output
         } catch {
             return nil
@@ -928,33 +922,16 @@ final class SettingsStore {
     }
 
     private func spoofdpiSupportsHeadlessMode(binaryPath: String) -> Bool {
-        guard FileManager.default.isExecutableFile(atPath: binaryPath) else { return false }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: binaryPath)
-        process.arguments = ["--version"]
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            guard let output = String(data: data, encoding: .utf8) else { return false }
-            let pattern = #"spoofdpi\s+(\d+)\.(\d+)\.(\d+)"#
-            guard let regex = try? NSRegularExpression(pattern: pattern),
-                  let match = regex.firstMatch(in: output, range: NSRange(output.startIndex..., in: output)),
-                  let majorRange = Range(match.range(at: 1), in: output),
-                  let minorRange = Range(match.range(at: 2), in: output),
-                  let major = Int(output[majorRange]),
-                  let minor = Int(output[minorRange]) else {
-                return false
-            }
-            return major > 1 || (major == 1 && minor >= 4)
-        } catch {
+        guard let output = backendProbeOutput(binaryPath: binaryPath, arguments: ["--version"]) else { return false }
+        let pattern = #"spoofdpi\s+(\d+)\.(\d+)\.(\d+)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: output, range: NSRange(output.startIndex..., in: output)),
+              let majorRange = Range(match.range(at: 1), in: output),
+              let minorRange = Range(match.range(at: 2), in: output),
+              let major = Int(output[majorRange]),
+              let minor = Int(output[minorRange]) else {
             return false
         }
+        return major > 1 || (major == 1 && minor >= 4)
     }
 }
