@@ -268,19 +268,22 @@ final class DPIKillerManager {
         process.standardOutput = pipe
         process.standardError = pipe
 
-        pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+        let backendLog = BackendLogStream(engine: engine)
+        pipe.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
             if data.isEmpty {
+                backendLog.finish()
                 handle.readabilityHandler = nil
                 return
             }
+            backendLog.append(data, captureVerbose: SettingsStore.shared.selectedFlags(for: engine).contains("--debug") || LogStore.shared.shouldCaptureProcessLogs())
             if let str = String(data: data, encoding: .utf8), !str.isEmpty {
                 captureStartupOutput(str)
-                self?.recordBackendOutput(str, engine: engine)
             }
         }
 
         process.terminationHandler = { [weak self, weak process] _ in
+            backendLog.finish()
             DispatchQueue.main.async {
                 guard let self, let terminatedProcess = process else { return }
                 guard self.process === terminatedProcess else { return }
@@ -431,17 +434,6 @@ final class DPIKillerManager {
     private func proxyPassesInternetCheck(engine: BypassEngine, port: Int) -> Bool {
         let proxy = "\(engine.proxyMode == .socks ? "socks5h" : "http")://127.0.0.1:\(port)"
         return internetPassesCheck(proxy: proxy)
-    }
-
-    private func recordBackendOutput(_ text: String, engine: BypassEngine) {
-        if LogStore.shared.shouldCaptureProcessLogs() || SettingsStore.shared.selectedFlags(for: engine).contains("--debug") {
-            LogStore.shared.append(text)
-            return
-        }
-        let errors = text.components(separatedBy: .newlines).filter {
-            $0.range(of: "\\b(ERR|ERROR|FATAL|PANIC)\\b|\\berr=", options: [.regularExpression, .caseInsensitive]) != nil
-        }
-        if !errors.isEmpty { LogStore.shared.append(errors.joined(separator: "\n")) }
     }
 
     private func internetPassesCheck(proxy: String? = nil) -> Bool {
@@ -1014,17 +1006,20 @@ final class DPIKillerManager {
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = pipe
+        let backendLog = BackendLogStream(engine: engine)
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             if data.isEmpty {
+                backendLog.finish()
                 handle.readabilityHandler = nil
                 return
             }
+            backendLog.append(data, captureVerbose: SettingsStore.shared.selectedFlags(for: engine).contains("--debug") || LogStore.shared.shouldCaptureProcessLogs())
             guard let str = String(data: data, encoding: .utf8), !str.isEmpty else { return }
             self?.appendDualOutput(engine: engine, text: str)
-            self?.recordBackendOutput(str, engine: engine)
         }
         process.terminationHandler = { [weak self, weak process] _ in
+            backendLog.finish()
             DispatchQueue.main.async {
                 guard let self, process != nil else { return }
                 self.dualBackendTerminated(engine: engine, process: process)
