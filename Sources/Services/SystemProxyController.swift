@@ -18,11 +18,16 @@ final class SystemProxyController {
         let port: Int
         let prefixes: [String]
         let originals: [String: Endpoint]
+        let originalExceptions: [String]?
+        let addedExceptions: [String]?
 
         var isValid: Bool {
             !serviceID.isEmpty && (1...65535).contains(port)
                 && !prefixes.isEmpty && Set(prefixes).count == prefixes.count
                 && prefixes.allSatisfy { ["HTTP", "HTTPS", "SOCKS"].contains($0) && originals[$0] != nil }
+                && (addedExceptions ?? []).allSatisfy {
+                    SystemProxyController.localExceptions.contains($0) && !(originalExceptions ?? []).contains($0)
+                }
         }
     }
 
@@ -33,6 +38,11 @@ final class SystemProxyController {
         kSCPropNetProxiesProxyAutoConfigEnable as String,
         kSCPropNetProxiesProxyAutoDiscoveryEnable as String
     ]
+    private static let localExceptions = [
+        "localhost", "*.localhost", "*.local", "127.0.0.1", "127.0.0.0/8", "::1",
+        "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"
+    ]
+    private static let exceptionsKey = kSCPropNetProxiesExceptionsList as String
 
     private let leaseKey = "systemProxyLease"
     private let lock = NSRecursiveLock()
@@ -93,8 +103,7 @@ final class SystemProxyController {
         AppLogger.log("[Proxy] Apply requested: mode=\(mode), endpoint=127.0.0.1:\(port).")
         let prefixes = mode == .http ? ["HTTP", "HTTPS"] : ["SOCKS"]
         if isAlreadyApplied(prefixes: prefixes, port: port) {
-            AppLogger.log("[Proxy] Requested system proxy is already saved and active; no network changes needed.")
-            return nil
+            return repairLocalExceptions(prefixes: prefixes, port: port)
         }
         guard restore() else { return lastError ?? L10n.shared.systemProxyApplyFailed }
         guard (1...65535).contains(port) else { return failure("validate port", detail: "Invalid loopback port \(port)") }
@@ -133,7 +142,10 @@ final class SystemProxyController {
                 enabled: Self.number(configuration["\(prefix)Enable"])
             )
         }
-        let lease = Lease(serviceID: serviceID, port: port, prefixes: prefixes, originals: originals)
+        let originalExceptions = configuration[Self.exceptionsKey] as? [String]
+        let lease = Lease(serviceID: serviceID, port: port, prefixes: prefixes, originals: originals,
+                          originalExceptions: originalExceptions,
+                          addedExceptions: Self.localExceptions.filter { !(originalExceptions ?? []).contains($0) })
         guard let data = try? JSONEncoder().encode(lease) else {
             return failure("save recovery snapshot", detail: "Could not encode proxy lease")
         }
@@ -148,6 +160,7 @@ final class SystemProxyController {
             configuration["\(prefix)Port"] = port
             configuration["\(prefix)Enable"] = 1
         }
+        Self.addLocalExceptions(to: &configuration)
 
         let error = write(configuration, proxy: proxy, preferences: preferences, operation: "apply")
         // Recovery needs its own session and lock after this transaction ends.
@@ -325,6 +338,64 @@ final class SystemProxyController {
                                         configuration: configuration, active: active)
     }
 
+    private func repairLocalExceptions(prefixes: [String], port: Int) -> String? {
+        guard let data = defaults.data(forKey: leaseKey),
+              let lease = try? JSONDecoder().decode(Lease.self, from: data),
+              let store = SCDynamicStoreCreate(nil, "DPI Killer" as CFString, nil, nil),
+              let preferences = SCPreferencesCreate(nil, "DPI Killer" as CFString, nil),
+              let service = SCNetworkServiceCopy(preferences, lease.serviceID as CFString),
+              let proxy = SCNetworkServiceCopyProtocol(service, kSCNetworkProtocolTypeProxies),
+              let configuration = SCNetworkProtocolGetConfiguration(proxy) as? [String: Any],
+              let active = SCDynamicStoreCopyProxies(store) as? [String: Any] else {
+            return failure("read local proxy exclusions")
+        }
+        if Self.hasLocalExceptions(configuration), Self.hasLocalExceptions(active) { return nil }
+        guard let authorized = authorizedPreferences(), SCPreferencesLock(authorized, false) else {
+            return lastError ?? failure("lock local proxy exclusions")
+        }
+        defer { SCPreferencesUnlock(authorized) }
+        guard primaryService(in: store) == lease.serviceID,
+              let service = SCNetworkServiceCopy(authorized, lease.serviceID as CFString),
+              let proxy = SCNetworkServiceCopyProtocol(service, kSCNetworkProtocolTypeProxies),
+              var latest = SCNetworkProtocolGetConfiguration(proxy) as? [String: Any],
+              let active = SCDynamicStoreCopyProxies(store) as? [String: Any],
+              Self.matchesAppliedLease(lease, prefixes: prefixes, port: port, serviceID: lease.serviceID,
+                                       configuration: latest, active: active) else {
+            return failure("recheck local proxy exclusions", detail: L10n.shared.systemProxyConflict)
+        }
+        // Extend old leases before changing their exclusions; never cycle a live endpoint.
+        let originalExceptions = lease.addedExceptions == nil
+            ? latest[Self.exceptionsKey] as? [String] : lease.originalExceptions
+        let additions = Self.localExceptions.filter {
+            !(latest[Self.exceptionsKey] as? [String] ?? []).contains($0) && !(originalExceptions ?? []).contains($0)
+        }
+        let updated = Lease(serviceID: lease.serviceID, port: lease.port, prefixes: lease.prefixes,
+                            originals: lease.originals, originalExceptions: originalExceptions,
+                            addedExceptions: (lease.addedExceptions ?? []) + additions.filter { !(lease.addedExceptions ?? []).contains($0) })
+        guard let snapshot = try? JSONEncoder().encode(updated) else { return failure("encode exclusion snapshot") }
+        defaults.set(snapshot, forKey: leaseKey)
+        guard defaults.synchronize(), defaults.data(forKey: leaseKey) == snapshot else {
+            return failure("save exclusion snapshot")
+        }
+        Self.addLocalExceptions(to: &latest)
+        if let error = write(latest, proxy: proxy, preferences: authorized, operation: "repair local exclusions") { return error }
+        guard waitForActive(latest, prefixes: prefixes, serviceID: lease.serviceID, restoring: false) else {
+            return failure("verify local proxy exclusions")
+        }
+        return nil
+    }
+
+    private static func hasLocalExceptions(_ configuration: [String: Any]) -> Bool {
+        let exceptions = configuration[exceptionsKey] as? [String] ?? []
+        return localExceptions.allSatisfy(exceptions.contains)
+    }
+
+    private static func addLocalExceptions(to configuration: inout [String: Any]) {
+        var exceptions = configuration[exceptionsKey] as? [String] ?? []
+        exceptions.append(contentsOf: localExceptions.filter { !exceptions.contains($0) })
+        configuration[exceptionsKey] = exceptions
+    }
+
     private static func matchesAppliedLease(_ lease: Lease, prefixes: [String], port: Int, serviceID: String,
                                             configuration: [String: Any], active: [String: Any]) -> Bool {
         guard lease.isValid, lease.prefixes == prefixes, lease.port == port, lease.serviceID == serviceID,
@@ -363,7 +434,8 @@ final class SystemProxyController {
         repeat {
             guard primaryService(in: store) == serviceID else { return restoring }
             if let active = SCDynamicStoreCopyProxies(store) as? [String: Any] {
-                if Self.activeMatches(active, expected: expected, prefixes: prefixes) { return true }
+                if Self.activeMatches(active, expected: expected, prefixes: prefixes),
+                   restoring || Self.hasLocalExceptions(active) { return true }
                 // VPNs can project a different global proxy. Never undo or wait
                 // on a foreign endpoint once our exact endpoint has disappeared.
                 if restoring, let ownedPort, !prefixes.contains(where: { prefix in
@@ -401,6 +473,22 @@ final class SystemProxyController {
 
     private static func restoreOwnedEntries(_ lease: Lease, in configuration: inout [String: Any]) -> Bool {
         var changed = false
+        let ownsEndpoint = lease.prefixes.contains { prefix in
+            configuration["\(prefix)Proxy"] as? String == "127.0.0.1"
+                && number(configuration["\(prefix)Port"]) == lease.port
+        }
+        if ownsEndpoint, let additions = lease.addedExceptions,
+           let exceptions = configuration[exceptionsKey] as? [String] {
+            var restored = exceptions
+            for addition in Set(additions) {
+                if let index = restored.firstIndex(of: addition) { restored.remove(at: index) }
+            }
+            if restored != exceptions {
+                set(restored.isEmpty && lease.originalExceptions == nil ? nil : restored,
+                    for: exceptionsKey, in: &configuration)
+                changed = true
+            }
+        }
         for prefix in lease.prefixes {
             guard let original = lease.originals[prefix],
                   configuration["\(prefix)Proxy"] as? String == "127.0.0.1",

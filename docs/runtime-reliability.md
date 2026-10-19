@@ -1,5 +1,30 @@
 # Runtime reliability repair
 
+## Local proxy exclusions — source checkpoint
+
+`SystemProxyController` now merges loopback, localhost, `.local` and RFC1918
+exceptions into the existing list. Reapplying an active endpoint repairs missing
+exceptions without stopping the proxy. Its backward-compatible lease records
+only its additions; restoration preserves original entries and later foreign
+entries, including matching duplicates, and leaves a foreign endpoint untouched.
+
+The [in-memory probe](local-proxy-exclusions-probe.swift) checks the production
+functions and CFNetwork resolution without changing system preferences:
+
+```sh
+probe_dir="$(mktemp -d /private/tmp/dpikiller-exclusions.XXXXXX)"
+cat Sources/Services/SystemProxyController.swift docs/local-proxy-exclusions-probe.swift > "$probe_dir/main.swift"
+swiftc -D DPIKILLER_NETWORK_HELPER "$probe_dir/main.swift" Sources/Core/BypassEngine.swift Sources/Core/SettingsModels.swift Sources/Core/Localization.swift Sources/Core/Logging.swift -o "$probe_dir/probe"
+"$probe_dir/probe"
+```
+
+October 18 verification passed 30 local/public/boundary HTTP and SOCKS routing
+cases plus merge, repeat-apply eligibility, restoration, old-lease decoding,
+foreign endpoints and duplicate preservation. App and helper source typechecks
+also passed. This checkpoint does not replace the installed app or claim a live
+Apply/Stop replay. The current macOS bypass settings already resolve local
+destinations directly; cold development compilation remains a separate delay.
+
 Outcome: keep the existing hotspot TTL 65 setup and a usable local proxy through
 start, stop, restart and network recovery. Scope is manager, connectivity and
 proxy restoration, including the installed app. The initial repair scope was
