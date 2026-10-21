@@ -836,7 +836,7 @@ final class SettingsViewModel: ObservableObject {
             .spoofdpi: draft.spoofdpi.selectedFlags
         ]
         spoofdpiStatusMessage = L10n.shared.isRussian ? "SpoofDPI установлен." : "SpoofDPI is installed."
-        ciadpiStatusMessage = FileManager.default.isExecutableFile(atPath: store.managedCiadpiPath)
+        ciadpiStatusMessage = ciadpiUpdater.preferredInstalledPath() != nil
             ? (L10n.shared.isRussian ? "ciadpi установлен." : "ciadpi is installed.")
             : (L10n.shared.isRussian ? "Managed ciadpi не установлен." : "Managed ciadpi is not installed.")
         vpnAvailabilityIssue = systemExtensionManager.availabilityIssue()
@@ -984,7 +984,7 @@ final class SettingsViewModel: ObservableObject {
     }
 
     var ciadpiManagedPath: String {
-        compactPath(store.managedCiadpiPath)
+        compactPath(ciadpiStatus?.managedPath ?? ciadpiUpdater.preferredInstalledPath() ?? store.managedCiadpiPath)
     }
 
     var ciadpiManagedVersion: String {

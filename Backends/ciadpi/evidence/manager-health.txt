@@ -1,0 +1,4 @@
+PASS bundled upgrade, custom path, native SOCKS readiness and healthy PID retention
+PASS two tolerated local failures; confirmed unresponsive child replaced and reaped
+PASS explicit stop, no child resurrection and no system proxy lease
+PASS pre-existing backend and complete system proxy dictionary preserved

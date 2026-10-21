@@ -1,5 +1,7 @@
 # Runtime reliability repair
 
+Current disconnect work and acceptance: [4.0.8](#408-disconnect-repair).
+
 ## Local proxy exclusions — source checkpoint
 
 `SystemProxyController` now merges loopback, localhost, `.local` and RFC1918
@@ -189,3 +191,70 @@ one listener on port 18082. TTL remains 65 and the stale lease is absent. The
 installed executable SHA-256 is
 `b4de4ee541402db0835843aaf1139ee7774ad2900c605b80672d016f6b5d3be1`.
 The app is left running; no Wi-Fi network selection was performed.
+
+## 4.0.8 disconnect repair
+
+Outcome: keep unrelated SOCKS connections responsive during slow DNS and stop
+recycling an otherwise working backend because a remote health URL failed.
+The release must include the repaired engine, select it after upgrading an
+existing managed installation, retain newer explicitly updated engines, and
+remain available as a signed GitHub DMG.
+
+Owners: the pinned ciadpi adaptation under `Backends/ciadpi` and
+`scripts/build_ciadpi.sh` own the engine recipe; `build.sh` embeds its output.
+`CiadpiUpdater` owns bundled/managed selection and prevents reinstalling the
+older upstream tag over the bundled repair. `DPIKillerManager` owns local
+protocol readiness and process recovery. DNS workers must never mutate event
+pool/client state or reuse a disconnected client's descriptor.
+
+Observed baseline: the installed ciadpi reports 17.3 but includes changes after
+the upstream v0.17.3 tag. Source at upstream commit
+`ba532298de7b28cfe854aea83d061369d13ca290` calls `getaddrinfo` synchronously in
+the event loop. An isolated three-second resolver stall blocked an existing
+numeric SOCKS echo tunnel for 3005.3 ms and a new greeting for 3005.2 ms.
+The current upstream release and reviewed DNS PRs do not fix this starvation.
+The watchdog additionally makes DNS/TLS requests every 30 seconds and may kill
+all live tunnels after three remote-only failures.
+
+Acceptance: repeat the delayed-DNS case with responsive existing numeric
+traffic and new greetings; cover successful and failed DNS, disconnected
+clients and bounded worker saturation. Verify local readiness, preserved PID
+through remote failure, genuine dead/unresponsive backend recovery, ordinary
+upgrade selection and the signed downloaded release. Preserve explicit Stop,
+custom executable paths and the pre-existing live network configuration.
+No permanent test infrastructure is added. Physical network changes and
+historic localhost refusals are distinct observations, not proven DNS effects.
+
+The supplied 300-line rolling log has no dates. A live 64-request sample on
+2026-10-21 took 87.46 seconds: 29/32 direct and 28/32 SOCKS requests succeeded;
+the seven failures were three-second timeouts during the first two rounds.
+At another moment local greetings and both routes succeeded. These observations
+do not identify every historical outage. Earlier checkpoints above describe
+their own versions and must not be used as 4.0.8 acceptance.
+
+Verified candidate on macOS 27.0.1 with Xcode 27.1: the signed universal app
+and helper pass strict signature verification. The packaged ciadpi targets
+macOS 13 and passes the delayed-DNS replay in both arm64 and x86_64 modes;
+existing traffic and new greetings respond in 0.2–0.5 ms during the same
+three-second DNS stall. DNS errors, eight-worker saturation, cancellation with
+late completion, capacity reuse, SOCKS4a and repeated UDP-domain traffic pass.
+Inputs, commands and raw timings are retained in
+[the backend recipe](../Backends/ciadpi/README.md#reproduction-evidence).
+
+The [native manager fixture](backend-health-probe.swift) compiles production
+manager/settings/updater/network code with UI-only stubs and a unique app
+preferences domain. It verifies ordinary old-managed selection resolving to
+the bundled engine, preservation of custom paths, four healthy checks retaining
+the same PID, two tolerated local failures, replacement and reaping after the
+third confirmed protocol failure, and explicit Stop without resurrection.
+[Its output](../Backends/ciadpi/evidence/manager-health.txt) also records that the
+pre-existing backend and complete system proxy dictionary were preserved.
+An isolated packaged engine then completed four HTTPS requests with the user's
+TTL 65/auto/tlsrec/disorder arguments, alongside four successful direct requests;
+[raw results](../Backends/ciadpi/evidence/https.json) retain URLs and timings.
+
+The Intel-mode verification uses Rosetta explicitly and can produce macOS's
+future-compatibility warning. Normal launch on Apple Silicon uses arm64;
+every executable in the candidate app includes arm64. Apple documents the
+[macOS 28 Rosetta restriction](https://support.apple.com/en-ie/102527).
+Neither these replays nor the source fix certify a future macOS release.

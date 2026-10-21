@@ -8,8 +8,8 @@ configs:
 settings:
   base:
     SWIFT_VERSION: 5.0
-    MARKETING_VERSION: 4.0.7
-    CURRENT_PROJECT_VERSION: 4.0.7
+    MARKETING_VERSION: 4.0.8
+    CURRENT_PROJECT_VERSION: 4.0.8
 targets:
   DPIKiller:
     type: application

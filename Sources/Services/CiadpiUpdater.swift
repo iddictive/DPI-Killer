@@ -23,31 +23,44 @@ final class CiadpiUpdater {
 
     private init() {}
 
+    var bundledBinaryPath: String? {
+        Bundle.main.path(forAuxiliaryExecutable: "ciadpi-binary")
+    }
+
+    /// Ship the repaired engine with the app, retaining an explicitly updated
+    /// managed engine only when its upstream version is actually newer.
+    func preferredInstalledPath() -> String? {
+        let managed = SettingsStore.shared.managedCiadpiPath
+        let hasManaged = FileManager.default.isExecutableFile(atPath: managed)
+        guard let bundled = bundledBinaryPath else { return hasManaged ? managed : nil }
+        if hasManaged, let managedVersion = version(at: managed), let bundledVersion = version(at: bundled),
+           managedVersion.compare(bundledVersion, options: .numeric) == .orderedDescending {
+            return managed
+        }
+        return bundled
+    }
+
     func localStatus(selectedPath: String) -> CiadpiUpdateStatus {
-        let managedPath = SettingsStore.shared.managedCiadpiPath
+        status(selectedPath: selectedPath)
+    }
+
+    private func status(selectedPath: String, release: CiadpiRelease? = nil) -> CiadpiUpdateStatus {
+        let managedPath = preferredInstalledPath() ?? SettingsStore.shared.managedCiadpiPath
         return CiadpiUpdateStatus(
             selectedPath: selectedPath,
             managedPath: managedPath,
             selectedVersion: version(at: selectedPath),
             managedVersion: version(at: managedPath),
-            latestVersion: nil,
-            sourceTarballURL: nil
+            latestVersion: release?.version,
+            sourceTarballURL: release?.sourceTarballURL
         )
     }
 
     func checkStatus(selectedPath: String, completion: @escaping (Result<CiadpiUpdateStatus, Error>) -> Void) {
-        let managedPath = SettingsStore.shared.managedCiadpiPath
         fetchLatestRelease { result in
             switch result {
             case .success(let release):
-                completion(.success(CiadpiUpdateStatus(
-                    selectedPath: selectedPath,
-                    managedPath: managedPath,
-                    selectedVersion: self.version(at: selectedPath),
-                    managedVersion: self.version(at: managedPath),
-                    latestVersion: release.version,
-                    sourceTarballURL: release.sourceTarballURL
-                )))
+                completion(.success(self.status(selectedPath: selectedPath, release: release)))
             case .failure(let error):
                 completion(.failure(error))
             }
@@ -58,6 +71,14 @@ final class CiadpiUpdater {
         fetchLatestRelease { result in
             switch result {
             case .success(let release):
+                if let bundled = self.bundledBinaryPath, let bundledVersion = self.version(at: bundled),
+                   bundledVersion.compare(release.version, options: .numeric) != .orderedAscending {
+                    // The release tag can predate the bundled source revision.
+                    // Reinstalling the same version must not undo the repair.
+                    let selectedPath = SettingsStore.shared.resolvedBinaryPath(for: .ciadpi)
+                    completion(.success(self.status(selectedPath: selectedPath, release: release)))
+                    return
+                }
                 self.downloadBuildAndInstall(release: release, completion: completion)
             case .failure(let error):
                 completion(.failure(error))
@@ -112,14 +133,7 @@ final class CiadpiUpdater {
             do {
                 try self.buildAndInstallArchive(at: localURL)
                 let selectedPath = SettingsStore.shared.resolvedBinaryPath(for: .ciadpi)
-                completion(.success(CiadpiUpdateStatus(
-                    selectedPath: selectedPath,
-                    managedPath: SettingsStore.shared.managedCiadpiPath,
-                    selectedVersion: self.version(at: selectedPath),
-                    managedVersion: self.version(at: SettingsStore.shared.managedCiadpiPath),
-                    latestVersion: release.version,
-                    sourceTarballURL: release.sourceTarballURL
-                )))
+                completion(.success(self.status(selectedPath: selectedPath, release: release)))
             } catch {
                 completion(.failure(error))
             }

@@ -1,0 +1,64 @@
+{
+  "date": "2026-10-21",
+  "configuration": "TTL 65, auto torst, tlsrec 1+s, disorder 1; isolated loopback listener; existing system proxy untouched",
+  "requests": [
+    {
+      "route": "direct",
+      "url": "https://www.apple.com/library/test/success.html",
+      "exit": 0,
+      "result": "200 0.176620",
+      "error": ""
+    },
+    {
+      "route": "candidate",
+      "url": "https://www.apple.com/library/test/success.html",
+      "exit": 0,
+      "result": "200 0.156523",
+      "error": ""
+    },
+    {
+      "route": "direct",
+      "url": "https://www.cloudflare.com/cdn-cgi/trace",
+      "exit": 0,
+      "result": "200 0.164392",
+      "error": ""
+    },
+    {
+      "route": "candidate",
+      "url": "https://www.cloudflare.com/cdn-cgi/trace",
+      "exit": 0,
+      "result": "200 0.147768",
+      "error": ""
+    },
+    {
+      "route": "direct",
+      "url": "https://www.apple.com/library/test/success.html",
+      "exit": 0,
+      "result": "200 0.137159",
+      "error": ""
+    },
+    {
+      "route": "candidate",
+      "url": "https://www.apple.com/library/test/success.html",
+      "exit": 0,
+      "result": "200 0.136966",
+      "error": ""
+    },
+    {
+      "route": "direct",
+      "url": "https://www.cloudflare.com/cdn-cgi/trace",
+      "exit": 0,
+      "result": "200 0.108056",
+      "error": ""
+    },
+    {
+      "route": "candidate",
+      "url": "https://www.cloudflare.com/cdn-cgi/trace",
+      "exit": 0,
+      "result": "200 0.107954",
+      "error": ""
+    }
+  ],
+  "candidate_pid_retained": true,
+  "existing_backend_and_proxy_preserved": true
+}

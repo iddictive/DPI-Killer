@@ -121,11 +121,9 @@ cp README.md "${APP_BUNDLE}/Contents/Resources/README.md"
 mkdir -p "${APP_BUNDLE}/Contents/Resources/assets"
 cp assets/banner.png "${APP_BUNDLE}/Contents/Resources/assets/banner.png"
 
-# Copy optional bundled backends
-if [ -f "ciadpi-binary" ]; then
-    cp ciadpi-binary "${APP_BUNDLE}/Contents/MacOS/ciadpi-binary"
-    chmod +x "${APP_BUNDLE}/Contents/MacOS/ciadpi-binary"
-fi
+# The app and CI consume the same pinned, repaired engine recipe.
+bash scripts/build_ciadpi.sh "$PWD/${APP_BUNDLE}/Contents/MacOS/ciadpi-binary"
+cp Backends/ciadpi/LICENSE "${APP_BUNDLE}/Contents/Resources/ciadpi-LICENSE"
 
 if [ -f "spoofdpi-patched" ]; then
     cp spoofdpi-patched "${APP_BUNDLE}/Contents/MacOS/spoofdpi-binary"
@@ -137,6 +135,8 @@ if [ -n "${DPIKILLER_LOCAL_SIGN_IDENTITY:-}" ]; then
     codesign --force --sign "${DPIKILLER_LOCAL_SIGN_IDENTITY}" \
         --identifier com.antigravity.DPIKiller.NetworkHelper \
         "${APP_BUNDLE}/Contents/Library/HelperTools/DPIKillerNetworkHelper"
+    codesign --force --sign "${DPIKILLER_LOCAL_SIGN_IDENTITY}" \
+        "${APP_BUNDLE}/Contents/MacOS/ciadpi-binary"
     codesign --force --deep --sign "${DPIKILLER_LOCAL_SIGN_IDENTITY}" "${APP_BUNDLE}"
     codesign --verify --deep --strict "${APP_BUNDLE}"
 fi

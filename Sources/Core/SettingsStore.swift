@@ -559,6 +559,9 @@ final class SettingsStore {
     }
 
     private func resolvedBinaryPath(fromStored stored: String) -> String {
+        if stored == managedCiadpiPath, let preferred = CiadpiUpdater.shared.preferredInstalledPath() {
+            return preferred
+        }
         guard !binaryPathWasUserSet else {
             return stored
         }
@@ -574,7 +577,7 @@ final class SettingsStore {
     private func preferredCiadpiPaths() -> [String] {
         let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
         return [
-            Bundle.main.path(forResource: "ciadpi-binary", ofType: nil, inDirectory: "MacOS"),
+            CiadpiUpdater.shared.preferredInstalledPath(),
             managedCiadpiPath,
             "/opt/homebrew/bin/ciadpi",
             "/usr/local/bin/ciadpi",

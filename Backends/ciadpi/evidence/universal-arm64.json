@@ -1,0 +1,11 @@
+{
+  "greeting_ms": 0.2,
+  "tunnel_ms": 0.2,
+  "dns_failure_reply": "05040001000000000000",
+  "saturation_reply": "05040001000000000000",
+  "saturated_greeting_ms": 0.2,
+  "cancel_late_completion_reuse": "passed",
+  "socks4a": "passed",
+  "udp_dns_greeting_ms": 0.5,
+  "udp_domain_twice": "passed"
+}

@@ -47,7 +47,7 @@ Requires macOS 13 or newer. Version 4.0.4 uses an Apple development signature; i
 | Local proxy (default) | Runs a loopback proxy without changing macOS proxy settings | A client configured for the displayed proxy type and runtime port |
 | System proxy (explicit) | Configures the current network connection after the local backend is ready | An available connection without another active proxy |
 
-The app restores the connection's prior proxy settings when stopped. Temporary loss of internet does not recycle a healthy local backend. Repeated proxy failures trigger recovery only when the direct route works. A real packet-tunnel VPN is not provided by these modes.
+The app restores the connection's prior proxy settings when stopped. Temporary loss of internet or failure of a remote site does not recycle a healthy local backend. The watchdog checks the local listener and SOCKS handshake; repeated local failures trigger recovery. A real packet-tunnel VPN is not provided by these modes.
 
 The menu's **System settings** selector chooses **Helper** (an installed privileged service for subsequent proxy/TTL changes) or **Direct** (macOS authorization for each privileged operation). The backend itself runs as the current user in both modes. A failed system-proxy operation shows an actionable warning rather than a green active state.
 
@@ -64,11 +64,7 @@ Settings apply automatically. Proxy-only changes keep the backend process; backe
 
 ## Backend installation
 
-ciadpi is built from ByeDPI source in the application's support directory. This requires `cc` and `make`; install Apple's Command Line Tools if they are missing:
-
-```bash
-xcode-select --install
-```
+ciadpi is included with the app. Its pinned ByeDPI source and macOS DNS adaptation are built by [scripts/build_ciadpi.sh](scripts/build_ciadpi.sh); slow DNS requests do not block unrelated proxy connections. The bundled engine is selected over an older managed copy. An explicitly installed newer upstream version and custom executable paths remain available.
 
 SpoofDPI is downloaded from a matching upstream macOS release asset.
 

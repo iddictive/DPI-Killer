@@ -431,34 +431,6 @@ final class DPIKillerManager {
         (NSApp.delegate as? AppDelegate)?.refreshUI()
     }
 
-    private func proxyPassesInternetCheck(engine: BypassEngine, port: Int) -> Bool {
-        let proxy = "\(engine.proxyMode == .socks ? "socks5h" : "http")://127.0.0.1:\(port)"
-        return internetPassesCheck(proxy: proxy)
-    }
-
-    private func internetPassesCheck(proxy: String? = nil) -> Bool {
-        for url in ["https://www.apple.com/library/test/success.html", "https://www.cloudflare.com/cdn-cgi/trace"] {
-            let task = Process()
-            task.executableURL = URL(fileURLWithPath: "/usr/bin/curl")
-            task.arguments = ["--silent", "--show-error", "--fail", "--location", "--connect-timeout", "3", "--max-time", "7", "--output", "/dev/null"]
-                + (proxy.map { ["--noproxy", "", "--proxy", $0] } ?? ["--noproxy", "*"])
-                + [url]
-            task.standardOutput = FileHandle.nullDevice
-            let errors = Pipe()
-            task.standardError = errors
-            do {
-                try task.run()
-                task.waitUntilExit()
-                if task.terminationStatus == 0 { return true }
-                let detail = String(data: errors.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-                AppLogger.log("[Probe] Failed: route=\(proxy ?? "direct"), target=\(url), exit=\(task.terminationStatus), detail=\(detail.trimmingCharacters(in: .whitespacesAndNewlines)).")
-            } catch {
-                AppLogger.log("[Manager] Proxy check could not start: \(error.localizedDescription)")
-            }
-        }
-        return false
-    }
-
     @discardableResult
     func stop(userRequested: Bool = true) -> Bool {
         if userRequested { userStopID = UUID() }
@@ -643,7 +615,7 @@ final class DPIKillerManager {
 
     private func restartAfterConnectivityRestoration(completion: @escaping (Bool, String?) -> Void) {
         if isRunning, process?.isRunning == true, activePort != nil,
-           let port = activePort, isLocalPortReachable(port: port) {
+           let port = activePort, isLocalPortReachable(port: port, engine: currentEngine) {
             shouldRestoreAfterDisconnect = false
             AppLogger.log("[Manager] Network restored. Keeping backend pid=\(process?.processIdentifier ?? 0) on port \(port).")
             completion(true, nil)
@@ -706,7 +678,7 @@ final class DPIKillerManager {
                 var dead: [BypassEngine] = []
                 for (engine, port) in snapshot {
                     let alive = self.dualProcesses[engine]?.isRunning ?? false
-                    if !alive || !self.isLocalPortReachable(port: port) {
+                    if !alive || !self.isLocalPortReachable(port: port, engine: engine) {
                         dead.append(engine)
                     }
                 }
@@ -726,27 +698,25 @@ final class DPIKillerManager {
         guard isRunning, didBecomeReady, NetworkMonitor.shared.isConnected,
               let port = activePort, let process else { return }
         let engine = currentEngine
-        let needsInternetCheck = SystemProxyController.shared.hasLease
         maintenanceQueue.async { [weak self] in
             guard let self else { return }
-            let reachable = self.isLocalPortReachable(port: port)
-            let internetWorks = !needsInternetCheck
-                || (reachable && self.proxyPassesInternetCheck(engine: engine, port: port))
-            let upstreamUnavailable = needsInternetCheck && !internetWorks && !self.internetPassesCheck()
+            // Remote DNS/TLS failures cannot establish that a local proxy is
+            // broken. Recycling it also disconnects unrelated working tunnels.
+            let reachable = self.isLocalPortReachable(port: port, engine: engine)
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.isRunning, self.didBecomeReady, self.process === process,
                       NetworkMonitor.shared.isConnected else { return }
                 let alive = process.isRunning
                 if alive && reachable {
-                    if upstreamUnavailable {
-                        self.servingFailureStrikes = 0
-                        AppLogger.log("[Watchdog] Internet unavailable on both paths. Keeping the backend alive.")
-                        return
-                    }
-                    self.servingFailureStrikes = internetWorks ? 0 : self.servingFailureStrikes + 1
+                    self.servingFailureStrikes = 0
+                    return
+                }
+                if alive {
+                    self.servingFailureStrikes += 1
+                    AppLogger.log("[Watchdog] Local proxy did not respond (strike \(self.servingFailureStrikes)/3).")
                     guard self.servingFailureStrikes >= 3 else { return }
                 }
-                AppLogger.log("[Watchdog] Backend not serving (process alive: \(alive), port reachable: \(reachable), internet works: \(internetWorks)). Recycling...")
+                AppLogger.log("[Watchdog] Local backend not serving (process alive: \(alive), protocol reachable: \(reachable)). Recycling...")
                 guard self.disableSystemProxy() else { return }
                 self.terminateBackend(process)
                 self.resetBackendState()
@@ -1200,17 +1170,14 @@ final class DPIKillerManager {
         let managedCiadpiPath = SettingsStore.shared.managedCiadpiPath
         let managedSpoofdpiPath = SettingsStore.shared.managedSpoofdpiPath
         let managedDir = URL(fileURLWithPath: managedCiadpiPath).deletingLastPathComponent().path
+        let bundledCiadpiPath = CiadpiUpdater.shared.bundledBinaryPath ?? ""
         return """
         set -e
         mkdir -p '\(managedDir)'
 
-        if command -v cc >/dev/null 2>&1 && command -v make >/dev/null 2>&1; then
-          tmpdir=$(mktemp -d)
-          trap 'rm -rf "$tmpdir"' EXIT INT TERM
-          cd "$tmpdir"
-          curl -fsSL https://codeload.github.com/hufrea/byedpi/tar.gz/refs/heads/main | tar -xz --strip-components=1
-          make >/dev/null
-          install -m 755 ciadpi '\(managedCiadpiPath)'
+        if [ ! -x \(shellQuoted(bundledCiadpiPath)) ]; then
+          echo 'The bundled ciadpi engine is missing. Reinstall DPI Killer.' >&2
+          exit 1
         fi
 
         python3 <<'PY'
@@ -1248,7 +1215,7 @@ final class DPIKillerManager {
                 os.chmod(target, 0o755)
         PY
 
-        if [ ! -x '\(managedCiadpiPath)' ] && [ ! -x '\(managedSpoofdpiPath)' ]; then
+        if [ ! -x \(shellQuoted(bundledCiadpiPath)) ] && [ ! -x '\(managedSpoofdpiPath)' ]; then
           echo 'No supported backends were installed.' >&2
           exit 1
         fi
@@ -1271,7 +1238,7 @@ final class DPIKillerManager {
                     completion(false)
                     return
                 }
-                if self.isLocalPortReachable(port: port) {
+                if self.isLocalPortReachable(port: port, engine: engine) {
                     AppLogger.log("[Manager] \(engine.displayName) listener is reachable on port \(port).")
                     completion(true)
                     return
@@ -1384,28 +1351,48 @@ final class DPIKillerManager {
             + "\""
     }
 
-    private func isLocalPortReachable(port: Int) -> Bool {
+    private func isLocalPortReachable(port: Int, engine: BypassEngine) -> Bool {
         guard let endpointPort = NWEndpoint.Port(rawValue: UInt16(port)) else { return false }
         let semaphore = DispatchSemaphore(value: 0)
         let connection = NWConnection(host: "127.0.0.1", port: endpointPort, using: .tcp)
         let queue = DispatchQueue(label: "com.iddictive.dpikiller.readiness")
+        let lock = NSLock()
         var reachable = false
+        var finished = false
+        let complete: (Bool) -> Void = { result in
+            lock.lock()
+            guard !finished else { lock.unlock(); return }
+            reachable = result
+            finished = true
+            lock.unlock()
+            semaphore.signal()
+        }
 
         connection.stateUpdateHandler = { state in
             switch state {
             case .ready:
-                reachable = true
-                semaphore.signal()
+                guard engine.proxyMode == .socks else { complete(true); return }
+                // A SOCKS greeting exercises the event loop without DNS or
+                // an outbound request. An open TCP backlog alone is not ready.
+                connection.send(content: Data([5, 1, 0]), completion: .contentProcessed { error in
+                    guard error == nil else { complete(false); return }
+                    connection.receive(minimumIncompleteLength: 2, maximumLength: 2) { data, _, _, error in
+                        complete(error == nil && data == Data([5, 0]))
+                    }
+                })
             case .waiting(_), .failed(_), .cancelled:
-                semaphore.signal()
+                complete(false)
             default:
                 break
             }
         }
 
         connection.start(queue: queue)
-        _ = semaphore.wait(timeout: .now() + 1.0)
+        _ = semaphore.wait(timeout: .now() + 2.0)
+        complete(false)
         connection.cancel()
+        lock.lock()
+        defer { lock.unlock() }
         return reachable
     }
 
